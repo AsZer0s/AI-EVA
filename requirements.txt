@@ -1,0 +1,79 @@
+# ========================================
+# AI-EVA Demo 项目依赖配置
+# ========================================
+# 版本: 1.0.0
+# Python 版本要求: 3.8+
+# 更新日期: 2024-10-15
+# ========================================
+
+# ========== 核心 Web 框架 ==========
+fastapi>=0.111.1              # 高性能异步 Web 框架
+uvicorn[standard]>=0.24.0     # ASGI 服务器
+pydantic>=2.0.0               # 数据验证
+python-multipart>=0.0.6       # 文件上传支持
+
+# ========== AI 模型核心依赖 ==========
+# PyTorch (根据需要选择 CPU 或 CUDA 版本)
+# CPU 版本（默认）：
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# CUDA 版本（如需 GPU 加速，请替换上面两行）：
+# 访问 https://pytorch.org/ 获取安装命令
+# 示例（CUDA 11.8）：
+# torch>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+# torchaudio>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+numpy>=1.24.0,<2.0.0          # 数值计算库
+scipy>=1.10.0                 # 科学计算库
+
+# ========== ChatTTS 语音合成 ==========
+ChatTTS                       # 文本转语音引擎
+omegaconf>=2.3.0             # ChatTTS 配置依赖
+vocos                        # 声码器
+vector-quantize-pytorch      # 向量量化
+
+# ========== SenseVoice 语音识别 ==========
+funasr>=1.1.3                # FunASR 框架
+modelscope>=1.9.0            # ModelScope 平台
+huggingface_hub>=0.19.0      # HuggingFace Hub
+
+# ========== 音频处理 ==========
+librosa>=0.10.0              # 音频分析
+soundfile>=0.12.0            # 音频文件读写
+pydub>=0.25.1                # 音频格式转换
+audioread>=3.0.0             # 音频文件解码
+
+# ========== 工具库 ==========
+python-dotenv>=1.0.0         # 环境变量管理
+aiofiles>=23.0.0             # 异步文件操作
+pyyaml>=6.0                  # YAML 配置文件
+
+# ========== HTTP 客户端 ==========
+httpx>=0.25.0                # 异步 HTTP 客户端
+requests>=2.31.0             # HTTP 请求库
+aiohttp>=3.9.0               # 异步 HTTP 客户端
+
+# ========== 性能与监控 ==========
+psutil>=5.9.0                # 系统监控
+cachetools>=5.3.0            # 缓存工具
+
+# ========== 日志与调试 ==========
+loguru>=0.7.0                # 增强日志（可选）
+colorama>=0.4.6              # 彩色日志输出
+
+# ========== 数据处理 ==========
+pandas>=2.0.0                # 数据处理（可选）
+pillow>=10.0.0               # 图像处理
+
+# ========== 其他依赖 ==========
+tqdm>=4.65.0                 # 进度条
+typing-extensions>=4.8.0     # 类型提示扩展
+pydantic-settings>=2.0.0     # Pydantic 设置管理
+
+# ========== 可选：开发工具 ==========
+# pytest>=7.4.0              # 测试框架
+# pytest-asyncio>=0.21.0     # 异步测试
+# black>=23.0.0              # 代码格式化
+# flake8>=6.0.0              # 代码检查
+# mypy>=1.5.0                # 类型检查

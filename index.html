@@ -1,0 +1,4709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI-EVA - 智能虚拟伴侣</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@1.0.7/lib/three-vrm.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #1a202c;
+      line-height: 1.6;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .app-container {
+      display: flex;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      margin: 10px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+    }
+    
+    .control-panel {
+      width: 320px;
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      border-right: 1px solid rgba(226, 232, 240, 0.8);
+      padding: 24px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e0 transparent;
+      z-index: 1000;
+      position: relative;
+      flex-shrink: 0;
+    }
+    
+    .control-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .control-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .control-panel::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      min-width: 0;
+      overflow: hidden;
+    }
+    
+    .scene-container {
+      flex: 1;
+      position: relative;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      overflow: hidden;
+      min-height: 300px;
+    }
+    
+    #vrm-viewer {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .chat-area {
+      height: 200px;
+      background: #ffffff;
+      border-top: 1px solid rgba(226, 232, 240, 0.8);
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(10px);
+      z-index: 10;
+      position: relative;
+      flex-shrink: 0;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e0 transparent;
+    }
+    
+    .chat-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 3px;
+    }
+    
+    .chat-input-area {
+      display: flex;
+      padding: 16px;
+      background: #f8fafc;
+      border-top: 1px solid rgba(226, 232, 240, 0.8);
+      gap: 12px;
+    }
+    
+    .chat-input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 14px;
+      background: #ffffff;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    
+    .chat-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-primary {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .btn-secondary:hover {
+      box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
+    }
+    
+    .control-section {
+      margin-bottom: 24px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(226, 232, 240, 0.6);
+    }
+    
+    .control-section h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .control-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .control-buttons button {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: #4a5568;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+      min-width: 120px;
+      justify-content: center;
+    }
+    
+    .control-buttons button:hover {
+      background: #f7fafc;
+      border-color: #cbd5e0;
+      transform: translateY(-1px);
+    }
+    
+    .control-buttons button.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    #voice-settings .control-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    #voice-settings .control-buttons button {
+      flex: none;
+      min-width: auto;
+    }
+    
+    @media (max-width: 768px) {
+      #voice-settings .control-buttons {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+    }
+    
+    .slider-container {
+      margin: 12px 0;
+    }
+    
+    .slider-container label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #4a5568;
+    }
+    
+    .slider-container input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #e2e8f0;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+    }
+    
+    .slider-container .value {
+      font-size: 11px;
+      color: #718096;
+      margin-left: 8px;
+      font-weight: 500;
+    }
+    
+    .file-input-container {
+      margin: 12px 0;
+    }
+    
+    .file-input-container input[type="file"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+      background: #f8fafc;
+      font-size: 12px;
+      color: #4a5568;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .file-input-container input[type="file"]:hover {
+      border-color: #667eea;
+      background: #f0f4ff;
+    }
+    
+    .status {
+      font-size: 11px;
+      color: #718096;
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: #f7fafc;
+      border-radius: 6px;
+      border-left: 3px solid #667eea;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .status-indicator {
+      font-size: 8px;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-indicator.connected {
+      color: #10b981;
+      animation: none;
+    }
+    
+    .status-indicator.connecting {
+      color: #f59e0b;
+    }
+    
+    .status-indicator.disconnected {
+      color: #ef4444;
+      animation: none;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .message-container {
+      display: flex;
+      margin-bottom: 16px;
+      animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes messageSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .message-bubble {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      word-wrap: break-word;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      line-height: 1.5;
+      font-size: 14px;
+      font-weight: 400;
+    }
+    
+    .user-message {
+      justify-content: flex-end;
+    }
+    
+    .user-message .message-bubble {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 6px;
+      margin-left: auto;
+    }
+    
+    .ai-message {
+      justify-content: flex-start;
+    }
+    
+    .ai-message .message-bubble {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      border-bottom-left-radius: 6px;
+      margin-right: auto;
+    }
+    
+    .system-message {
+      justify-content: center;
+    }
+    
+    .system-message .message-bubble {
+      background: rgba(251, 191, 36, 0.1);
+      color: #d69e2e;
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      font-size: 12px;
+      padding: 8px 12px;
+      max-width: 85%;
+      font-weight: 500;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 100px;
+      }
+    }
+    
+    @keyframes slideUp {
+      from {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 100px;
+      }
+      to {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+      }
+    }
+    
+    #typing-cursor {
+      animation: blink 1.2s infinite;
+      font-weight: bold;
+    }
+    
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    
+    .loading-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 50;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      backdrop-filter: blur(10px);
+    }
+    
+    .loading-spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .drop-zone-active {
+      border: 2px dashed #667eea !important;
+      background-color: rgba(102, 126, 234, 0.1) !important;
+    }
+    
+    
+    @media (min-width: 1200px) {
+      .app-container {
+        flex-direction: row;
+      }
+      
+      .control-panel {
+        width: 350px;
+        flex-shrink: 0;
+      }
+      
+      .main-area {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      .chat-area {
+        height: 220px;
+      }
+      
+      .scene-container {
+        flex: 1;
+        min-height: 400px;
+      }
+    }
+    
+    @media (max-width: 1199px) and (min-width: 769px) {
+      .app-container {
+        flex-direction: row;
+        margin: 8px;
+      }
+      
+      .control-panel {
+        width: 300px;
+        flex-shrink: 0;
+        padding: 20px;
+      }
+      
+      .main-area {
+        flex: 1;
+        min-width: 0;
+      }
+      
+      .chat-area {
+        height: 180px;
+      }
+      
+      .scene-container {
+        flex: 1;
+        min-height: 350px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column;
+        margin: 5px;
+        border-radius: 15px;
+        height: calc(100vh - 10px);
+      }
+      
+      .control-panel {
+        width: 100%;
+        height: auto;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+        padding: 16px;
+        flex-shrink: 0;
+      }
+      
+      .main-area {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .scene-container {
+        flex: 1;
+        min-height: 250px;
+      }
+      
+      .chat-area {
+        height: 180px;
+        flex-shrink: 0;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .app-container {
+        margin: 2px;
+        border-radius: 10px;
+        height: calc(100vh - 4px);
+      }
+      
+      .control-panel {
+        padding: 12px;
+        max-height: 35vh;
+      }
+      
+      .control-section {
+        margin-bottom: 16px;
+        padding: 12px;
+      }
+      
+      .control-section h3 {
+        font-size: 13px;
+      }
+      
+      .control-buttons {
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      .control-buttons button {
+        padding: 8px 12px;
+        font-size: 12px;
+        min-width: auto;
+        flex: none;
+      }
+      
+      .chat-area {
+        height: 160px;
+      }
+      
+      .scene-container {
+        min-height: 200px;
+      }
+    }
+    
+    .mobile-only {
+      display: none !important;
+    }
+    
+    @media (max-width: 768px) {
+      .mobile-only {
+        display: flex !important;
+      }
+      
+      .control-panel.hidden {
+        display: none;
+      }
+      
+      .control-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2000;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      
+      .control-panel.show {
+        display: block;
+        animation: slideInFromTop 0.3s ease-out;
+      }
+      
+      .control-panel.hide {
+        animation: slideOutToTop 0.3s ease-in;
+      }
+      
+      @keyframes slideInFromTop {
+        from {
+          transform: translateY(-100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      
+      @keyframes slideOutToTop {
+        from {
+          transform: translateY(0);
+          opacity: 1;
+        }
+        to {
+          transform: translateY(-100%);
+          opacity: 0;
+        }
+      }
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+      }
+      
+      .app-container {
+        background: rgba(26, 32, 44, 0.95);
+        color: #e2e8f0;
+      }
+      
+      .control-panel {
+        background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+        border-right-color: rgba(74, 85, 104, 0.3);
+      }
+      
+      .main-area {
+        background: #1a202c;
+      }
+      
+      .chat-area {
+        background: #1a202c;
+        border-top-color: rgba(74, 85, 104, 0.3);
+      }
+      
+      .chat-input-area {
+        background: #2d3748;
+        border-top-color: rgba(74, 85, 104, 0.3);
+      }
+      
+      .chat-input {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+      }
+      
+      .chat-input:focus {
+        border-color: #667eea;
+      }
+      
+      .control-section {
+        background: #2d3748;
+        border-color: rgba(74, 85, 104, 0.3);
+      }
+      
+      .control-section h3 {
+        color: #e2e8f0;
+      }
+      
+      .control-buttons button {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+      }
+      
+      .control-buttons button:hover {
+        background: #4a5568;
+      }
+    }
+    
+    .hidden { display: none; }
+    .text-center { text-align: center; }
+    .text-sm { font-size: 12px; }
+    .text-xs { font-size: 11px; }
+    .font-medium { font-weight: 500; }
+    .font-semibold { font-weight: 600; }
+    .opacity-50 { opacity: 0.5; }
+    .opacity-75 { opacity: 0.75; }
+    
+    #voice-indicator { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 10px; z-index: 100; display: none; }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    
+    .control-group { 
+      margin-bottom: 20px; 
+      padding: 15px; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 10px; 
+      background: rgba(255,255,255,0.5);
+    }
+    .control-group h3 { 
+      margin-bottom: 15px; 
+      padding-bottom: 8px; 
+      border-bottom: 2px solid #EC4899; 
+      color: #4f46e5; 
+    }
+    .control-buttons { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 10px; 
+      margin-bottom: 15px;
+    }
+    .control-buttons button { 
+      flex: 1; 
+      min-width: 120px; 
+      padding: 10px; 
+      border-radius: 8px; 
+      color: white; 
+      border: none; 
+      cursor: pointer; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 5px;
+    }
+    
+    .suggestion-btn {
+      display: inline-block;
+      margin: 2px;
+      padding: 5px 10px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 15px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .suggestion-btn:hover {
+      background: #2563eb;
+      transform: scale(1.05);
+    }
+    
+    .keyword-highlight {
+      background: #fef3c7;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+    
+    .emotion-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      margin-left: 5px;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message-container {
+      display: flex;
+      margin-bottom: 12px;
+      animation: messageSlideIn 0.3s ease-out;
+    }
+    
+    @keyframes messageSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .message-bubble {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      word-wrap: break-word;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    
+    .user-message {
+      justify-content: flex-end;
+    }
+    
+    .user-message .message-bubble {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+      margin-left: auto;
+    }
+    
+    .ai-message {
+      justify-content: flex-start;
+    }
+    
+    .ai-message .message-bubble {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      border-bottom-left-radius: 4px;
+      margin-right: auto;
+    }
+    
+    .system-message {
+      justify-content: center;
+    }
+    
+    .system-message .message-bubble {
+      background: rgba(251, 191, 36, 0.2);
+      color: #92400e;
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      font-size: 13px;
+      padding: 8px 12px;
+      max-width: 90%;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      .user-message .message-bubble {
+        background: linear-gradient(135deg, #4c51bf 0%, #553c9a 100%);
+      }
+      
+      .ai-message .message-bubble {
+        background: linear-gradient(135deg, #ec4899 0%, #ef4444 100%);
+      }
+      
+      .system-message .message-bubble {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+        border-color: rgba(251, 191, 36, 0.25);
+      }
+      
+      .message-bubble {
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      }
+    }
+    
+    .message-timestamp {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 4px;
+      text-align: right;
+    }
+    
+    #typing-cursor {
+      animation: blink 1s infinite;
+      font-weight: bold;
+    }
+    
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左侧控制面板 -->
+    <div class="control-panel">
+      <div class="control-section">
+        <h3>
+          <span class="material-icons-round">settings</span>
+          系统设置
+        </h3>
+        <div class="control-buttons">
+          <button id="open-settings" class="active">
+            <span class="material-icons-round">tune</span>
+            设置面板
+          </button>
+          <button id="share-btn" title="分享">
+            <span class="material-icons-round">share</span>
+            分享
+          </button>
+          <button id="toggle-control-panel" class="mobile-only" title="切换控制面板">
+            <span class="material-icons-round">menu</span>
+            切换面板
+          </button>
+  </div>
+        <div class="status" id="connection-status">系统已连接</div>
+      </div>
+      
+      <div class="control-section" id="ai-model-section">
+        <h3>
+          <span class="material-icons-round">smart_toy</span>
+          AI 模型
+        </h3>
+        <div class="slider-container" id="model-selector" style="display: none;">
+          <label>Ollama 模型:</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="ollama-model" class="chat-input" style="flex: 1;">
+              <option value="">正在加载模型...</option>
+            </select>
+            <button id="refresh-models" class="btn-primary" style="padding: 8px; font-size: 12px;" title="刷新模型列表">
+              <span class="material-icons-round">refresh</span>
+            </button>
+          </div>
+        </div>
+        <div class="status" id="ollama-status">
+          <span class="status-indicator" id="ollama-indicator">●</span>
+          <span id="ollama-text">Ollama 未连接</span>
+        </div>
+      </div>
+      
+      <div class="control-section" id="voice-settings">
+        <h3>
+          <span class="material-icons-round">record_voice_over</span>
+          语音设置
+        </h3>
+        <div class="control-buttons">
+          <button id="toggle-voice" class="active">
+            <span class="material-icons-round">mic</span>
+            语音输入
+          </button>
+          <button id="toggle-sensevoice">
+            <span class="material-icons-round">record_voice_over</span>
+            语音识别
+          </button>
+        </div>
+        <div class="slider-container">
+          <label>语速: <span class="value" id="tts-speed-value">1.0x</span></label>
+          <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+        <div class="status" id="tts-status">
+          <span class="status-indicator" id="tts-indicator">●</span>
+          <span id="tts-text">ChatTTS 未连接</span>
+        </div>
+      </div>
+      
+      <div class="control-section">
+        <h3>
+          <span class="material-icons-round">upload_file</span>
+          模型管理
+        </h3>
+        <div class="file-input-container">
+          <input type="file" id="vrm-file" accept=".vrm" />
+        </div>
+        <div class="status" id="vrm-status">
+          <span class="status-indicator" id="vrm-indicator">●</span>
+          <span id="vrm-text">未加载 VRM 模型</span>
+        </div>
+        
+        <!-- 模型调整参数 -->
+        <div id="model-controls" style="display: none;">
+          <div class="control-buttons">
+            <button id="reset-model-position" class="btn-secondary">
+              <span class="material-icons-round">refresh</span>
+              重置位置
+            </button>
+            <button id="center-model" class="btn-secondary">
+              <span class="material-icons-round">center_focus_strong</span>
+              居中显示
+            </button>
+          </div>
+          
+          <!-- 位置调整 -->
+          <div class="slider-container">
+            <label>X 位置</label>
+            <input type="range" id="model-x" min="-10" max="10" step="0.1" value="0" />
+            <span id="model-x-value">0</span>
+          </div>
+          <div class="slider-container">
+            <label>Y 位置</label>
+            <input type="range" id="model-y" min="-5" max="5" step="0.1" value="0" />
+            <span id="model-y-value">0</span>
+          </div>
+          <div class="slider-container">
+            <label>Z 位置</label>
+            <input type="range" id="model-z" min="-10" max="10" step="0.1" value="0" />
+            <span id="model-z-value">0</span>
+          </div>
+          
+          <!-- 旋转调整 -->
+          <div class="slider-container">
+            <label>X 旋转</label>
+            <input type="range" id="model-rotation-x" min="-180" max="180" step="1" value="0" />
+            <span id="model-rotation-x-value">0°</span>
+          </div>
+          <div class="slider-container">
+            <label>Y 旋转</label>
+            <input type="range" id="model-rotation-y" min="-180" max="180" step="1" value="0" />
+            <span id="model-rotation-y-value">0°</span>
+          </div>
+          <div class="slider-container">
+            <label>Z 旋转</label>
+            <input type="range" id="model-rotation-z" min="-180" max="180" step="1" value="0" />
+            <span id="model-rotation-z-value">0°</span>
+          </div>
+          
+          <!-- 缩放调整 -->
+          <div class="slider-container">
+            <label>缩放</label>
+            <input type="range" id="model-scale" min="0.1" max="3" step="0.1" value="1" />
+            <span id="model-scale-value">1.0</span>
+          </div>
+          
+          <!-- 动作控制 -->
+          <div class="control-buttons">
+            <button id="play-wave" class="btn-secondary">
+              <span class="material-icons-round">waving_hand</span>
+              挥手
+            </button>
+            <button id="play-nod" class="btn-secondary">
+              <span class="material-icons-round">keyboard_arrow_down</span>
+              点头
+            </button>
+            <button id="play-shake" class="btn-secondary">
+              <span class="material-icons-round">shake</span>
+              摇头
+            </button>
+            <button id="play-point" class="btn-secondary">
+              <span class="material-icons-round">pointing</span>
+              指向
+            </button>
+          </div>
+          
+          <!-- 表情控制 -->
+          <div class="slider-container">
+            <label>开心</label>
+            <input type="range" id="expression-happy" min="0" max="1" step="0.1" value="0" />
+            <span id="expression-happy-value">0</span>
+          </div>
+          <div class="slider-container">
+            <label>生气</label>
+            <input type="range" id="expression-angry" min="0" max="1" step="0.1" value="0" />
+            <span id="expression-angry-value">0</span>
+          </div>
+          <div class="slider-container">
+            <label>悲伤</label>
+            <input type="range" id="expression-sad" min="0" max="1" step="0.1" value="0" />
+            <span id="expression-sad-value">0</span>
+          </div>
+          <div class="slider-container">
+            <label>惊讶</label>
+            <input type="range" id="expression-surprised" min="0" max="1" step="0.1" value="0" />
+            <span id="expression-surprised-value">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 右侧主区域 -->
+    <div class="main-area">
+      <!-- 3D场景区域 -->
+      <div class="scene-container">
+    <canvas id="vrm-viewer"></canvas>
+        <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner"></div>
+          <div id="loading-text">正在加载模型...</div>
+      </div>
+    </div>
+      
+      <!-- 聊天区域 -->
+      <div class="chat-area">
+        <div class="chat-messages" id="chat-messages">
+          <!-- 初始欢迎消息 -->
+          <div class="message-container ai-message">
+            <div class="message-bubble">你好！我是你的AI伴侣。</div>
+          </div>
+          <div class="message-container ai-message">
+            <div class="message-bubble">你可以打字与我对话，也可以点击下方的麦克风按钮进行语音交流哦。</div>
+          </div>
+        </div>
+        
+        <!-- 输入区域 -->
+        <div class="chat-input-area">
+          <input id="chat-input" type="text" placeholder="输入消息..." class="chat-input" />
+          <button id="send-message" class="btn-primary" title="发送">
+            <span class="material-icons-round">send</span>
+            发送
+          </button>
+          <button id="voice-input-btn" class="btn-primary btn-secondary" title="语音输入">
+            <span class="material-icons-round">mic</span>
+            语音
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 语音识别指示器 -->
+  <div id="voice-indicator">
+    <div class="text-center">
+      <div class="material-icons text-4xl mb-2 pulse">mic</div>
+      <p>正在聆听...</p>
+      <p class="text-sm mt-2" id="voice-text"></p>
+    </div>
+  </div>
+
+  <!-- TTS状态指示器 -->
+  <div id="tts-indicator" class="absolute top-4 left-4 bg-blue-500/80 text-white px-3 py-2 rounded-lg z-30" style="display: none;">
+    <div class="flex items-center gap-2">
+      <div class="material-icons animate-spin">volume_up</div>
+      <span id="tts-status-text">正在生成语音...</span>
+    </div>
+  </div>
+
+  <!-- 引导教程覆盖层 -->
+  <div id="tutorial-overlay" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" style="display: none;">
+    <div class="bg-white rounded-2xl p-8 max-w-md mx-4">
+      <h3 class="text-2xl font-bold mb-4">🎭 欢迎使用 AI-EVA Demo</h3>
+      <div class="space-y-3 text-sm">
+        <p>✨ <strong>快速开始：</strong></p>
+        <p>1. 上传 VRM 模型文件（拖拽到界面）</p>
+        <p>2. 配置 AI 模型和音色设置</p>
+        <p>3. 开始对话或语音交互</p>
+        <p class="mt-4">💡 <strong>提示：</strong>点击右上角设置按钮查看更多功能</p>
+      </div>
+      <div class="flex gap-2 mt-6">
+        <button id="skip-tutorial" class="flex-1 p-2 bg-gray-500 text-white rounded">跳过</button>
+        <button id="start-tutorial" class="flex-1 p-2 bg-blue-500 text-white rounded">开始体验</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 聊天面板 -->
+  <div class="absolute top-4 right-4 h-[calc(100%-2rem)] w-80 bg-white/70 dark:bg-black/50 backdrop-blur-sm rounded-2xl shadow-lg flex flex-col p-4 z-20">
+    <div class="flex-shrink-0 mb-4 flex justify-between items-center">
+      <h2 class="text-3xl font-bold">EVA001</h2>
+      <div class="flex items-center gap-2">
+        <span id="connection-status" class="text-xs px-2 py-1 rounded-full bg-green-500 text-white">已连接</span>
+        <button id="share-btn" class="p-1 rounded-full hover:bg-gray-100" title="分享">
+          <span class="material-icons text-sm">share</span>
+        </button>
+      </div>
+    </div>
+    <div id="chat-messages" class="flex-grow overflow-y-auto pr-2 space-y-2">
+      <!-- 初始欢迎消息 -->
+      <div class="message-container ai-message">
+        <div class="message-bubble">你好！我是你的AI伴侣。</div>
+      </div>
+      <div class="message-container ai-message">
+        <div class="message-bubble">你可以打字与我对话，也可以点击下方的麦克风按钮进行语音交流哦。</div>
+      </div>
+    </div>
+    <div class="mt-2">
+      <div class="relative">
+        <input id="chat-input" type="text" placeholder="输入消息..." class="w-full py-2 pl-3 pr-16 text-lg bg-background-light dark:bg-background-dark border rounded-lg" />
+        <button id="send-message" class="absolute inset-y-0 right-8 flex items-center pr-3" title="发送"><span class="material-icons">send</span></button>
+        <button id="voice-input-btn" class="absolute inset-y-0 right-0 flex items-center pr-3" title="语音输入"><span class="material-icons">mic</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置面板 -->
+  <div id="settings-panel" class="absolute top-0 left-0 h-full w-96 bg-white/80 dark:bg-black/60 backdrop-blur-xl shadow-2xl z-40 p-6 flex flex-col settings-hidden overflow-y-auto">
+    <div class="flex items-center justify-between mb-8">
+      <h2 class="text-3xl font-bold">设置面板</h2>
+      <button id="close-settings" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-icons">close</span></button>
+    </div>
+    
+    <!-- API服务器设置 -->
+    <div class="control-group">
+      <h3 class="text-xl">API服务器设置</h3>
+      <div class="mb-4 p-3 bg-yellow-50 rounded-lg">
+        <p class="text-sm text-yellow-800">请根据您的服务配置正确地址：</p>
+        <ul class="text-xs text-yellow-700 mt-2 list-disc list-inside">
+          <li>Ollama默认端口: 11434</li>
+          <li>ChatTTS默认端口: 127.0.0.1:9966</li>
+        </ul>
+      </div>
+      <label class="block mb-2">Ollama服务器地址 (AI对话)
+        <input type="text" id="ollama-url" value="http://127.0.0.1:11434" class="w-full p-2 border rounded" />
+        <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:8000 或 http://127.0.0.1:8000</div>
+      </label>
+      <label class="block mb-2">ChatTTS服务器地址 (语音合成)
+        <input type="text" id="chat-tts-url" value="http://127.0.0.1:9966" class="w-full p-2 border rounded" />
+        <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:9966</div>
+      </label>
+      <label class="block mb-2">SenseVoice服务器地址 (语音识别)
+        <input type="text" id="sensevoice-url" value="http://127.0.0.1:50000" class="w-full p-2 border rounded" />
+        <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:50000</div>
+      </label>
+      <div class="flex gap-2 mt-2">
+        <button id="save-api-config" class="flex-1 p-2 bg-purple-500 text-white rounded">
+          <span class="material-icons-round">save</span>
+          保存配置
+        </button>
+        <button id="test-all-connections" class="flex-1 p-2 bg-blue-500 text-white rounded">测试所有连接</button>
+        <button id="test-ai-voice" class="flex-1 p-2 bg-green-500 text-white rounded">测试AI语音</button>
+      </div>
+      <div id="connection-results" class="mt-2 text-sm"></div>
+    </div>
+    
+    <!-- 动画控制 -->
+    <div class="control-group">
+      <h3 class="text-xl">动画控制</h3>
+      <div class="control-buttons">
+        <button id="toggle-breathing" class="bg-blue-500">呼吸动画:开</button>
+        <button id="toggle-blinking" class="bg-green-500">眨眼动画:开</button>
+        <button id="toggle-head-tracking" class="bg-purple-500">头部追踪:开</button>
+        <button id="toggle-eye-tracking" class="bg-indigo-500">眼睛追踪:开</button>
+      </div>
+    </div>
+    
+    <!-- 语音控制 -->
+    <div class="control-group">
+      <h3 class="text-xl">语音控制</h3>
+      <div class="control-buttons">
+        <button id="toggle-voice" class="bg-red-500">
+          <span class="material-icons">mic</span>
+          语音输入:关
+        </button>
+        <button id="toggle-sensevoice" class="bg-purple-500">
+          <span class="material-icons">record_voice_over</span>
+          SenseVoice:开
+        </button>
+        <button id="clear-chat" class="bg-yellow-500">
+          <span class="material-icons">clear_all</span>
+          清空对话
+        </button>
+      </div>
+      <div class="control-buttons">
+        <button id="export-txt" class="bg-green-500">
+          <span class="material-icons">download</span>
+          导出TXT
+        </button>
+        <button id="export-json" class="bg-blue-500">
+          <span class="material-icons">file_download</span>
+          导出JSON
+        </button>
+      </div>
+    </div>
+    
+    <!-- ChatTTS语音控制 -->
+    <div class="control-group">
+      <h3 class="text-xl">ChatTTS语音设置</h3>
+      <div class="control-buttons">
+        <button id="toggle-tts" class="bg-blue-500">
+          <span class="material-icons">volume_up</span>
+          TTS:开
+        </button>
+      </div>
+      <div class="slider-container">
+        <label for="voice-select">音色:</label>
+        <select id="voice-select" class="flex-grow p-2 border rounded">
+          <option value="1031.pt">1031.pt</option>
+          <option value="11.pt">11.pt</option>
+          <option value="1111.pt">1111.pt</option>
+          <option value="12.pt">12.pt</option>
+          <option value="1234.pt">1234.pt</option>
+          <option value="125.pt">125.pt</option>
+          <option value="13.pt">13.pt</option>
+          <option value="14.pt">14.pt</option>
+          <option value="1455.pt">1455.pt</option>
+          <option value="1518.pt">1518.pt</option>
+          <option value="1579.pt">1579.pt</option>
+          <option value="16.pt">16.pt</option>
+          <option value="1983.pt">1983.pt</option>
+          <option value="2222.pt">2222.pt</option>
+          <option value="2279.pt">2279.pt</option>
+          <option value="2328.pt">2328.pt</option>
+          <option value="2345.pt">2345.pt</option>
+          <option value="3333.pt">3333.pt</option>
+          <option value="4099.pt">4099.pt</option>
+          <option value="4444.pt">4444.pt</option>
+          <option value="4751.pt">4751.pt</option>
+          <option value="4785.pt">4785.pt</option>
+          <option value="491.pt">491.pt</option>
+          <option value="492.pt">492.pt</option>
+          <option value="5.pt">5.pt</option>
+          <option value="5099.pt">5099.pt</option>
+          <option value="5400.pt">5400.pt</option>
+          <option value="5555.pt">5555.pt</option>
+          <option value="5600.pt">5600.pt</option>
+          <option value="6653.pt">6653.pt</option>
+          <option value="6666.pt">6666.pt</option>
+          <option value="7777.pt">7777.pt</option>
+          <option value="7869.pt">7869.pt</option>
+          <option value="8888.pt">8888.pt</option>
+          <option value="9999.pt">9999.pt</option>
+        </select>
+      </div>
+      <div class="slider-container">
+        <label for="tts-speed">语速:</label>
+        <input type="range" id="tts-speed" min="1" max="9" step="1" value="5" class="flex-grow">
+        <span id="speed-value">5</span>
+      </div>
+      <div class="slider-container">
+        <label for="tts-temperature">Temperature:</label>
+        <input type="range" id="tts-temperature" min="0.1" max="1.0" step="0.1" value="0.3" class="flex-grow">
+        <span id="temperature-value">0.3</span>
+      </div>
+      <div class="flex items-center mt-2">
+        <input type="checkbox" id="skip-refine" checked class="mr-2">
+        <label for="skip-refine">跳过refine text</label>
+      </div>
+      <button id="test-tts" class="w-full p-2 bg-green-500 text-white rounded mt-2">测试语音</button>
+      <button id="preview-voice" class="w-full p-2 bg-orange-500 text-white rounded mt-2">预览当前音色</button>
+      <button id="stop-tts" class="w-full p-2 bg-red-500 text-white rounded mt-2">停止TTS播放</button>
+      <button id="test-ai-tts-flow" class="w-full p-2 bg-purple-500 text-white rounded mt-2">测试AI对话+TTS完整流程</button>
+    </div>
+    
+    <!-- Ollama设置 -->
+    <div class="control-group">
+      <h3 class="text-xl">Ollama设置</h3>
+      <label class="block mb-2">模型名称
+        <input type="text" id="ollama-model" value="gemma2:2b" class="w-full p-2 border rounded" />
+        <div class="text-xs text-gray-500 mt-1">常用模型: gemma2:2b, llama2, qwen2.5:3b</div>
+      </label>
+      <button id="test-connection" class="p-2 bg-blue-500 text-white rounded w-full">测试连接</button>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">上传VRM模型</h3>
+      <div id="vrm-drop-zone" class="border-2 border-dashed p-6 text-center cursor-pointer">拖放VRM文件或点击<input type="file" id="vrm-file-input" accept=".vrm" class="hidden"/></div>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">灯光设置</h3>
+      <label class="block mb-2">方向光强度<input type="range" id="dir-light-intensity" min="0" max="2" step="0.1" value="0.95" class="w-full"></label>
+      <label class="block mb-2">环境光强度<input type="range" id="amb-light-intensity" min="0" max="2" step="0.1" value="0.475" class="w-full"></label>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">呼吸动画设置</h3>
+      <label class="block mb-2">呼吸强度<input type="range" id="breath-intensity" min="0" max="1" step="0.05" value="0.3" class="w-full"></label>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">眨眼动画设置</h3>
+      <label class="block mb-2">眨眼间隔(秒)<input type="range" id="blink-interval" min="3" max="15" step="0.5" value="7" class="w-full"></label>
+      <label class="block mb-2">眨眼速度<input type="range" id="blink-speed" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></label>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">视线追踪设置</h3>
+      <label class="block mb-2">头部追踪速度<input type="range" id="head-tracking-speed" min="0.01" max="0.2" step="0.01" value="0.05" class="w-full"></label>
+      <label class="block mb-2">眼睛追踪速度<input type="range" id="eye-tracking-speed" min="0.01" max="0.3" step="0.01" value="0.1" class="w-full"></label>
+      <label class="block mb-2">头部X轴旋转限制(弧度)<input type="range" id="head-limit-x" min="0.1" max="0.5" step="0.05" value="0.3" class="w-full"></label>
+      <label class="block mb-2">头部Y轴旋转限制(弧度)<input type="range" id="head-limit-y" min="0.1" max="0.8" step="0.05" value="0.5" class="w-full"></label>
+      <label class="block mb-2">眼睛X轴旋转限制(弧度)<input type="range" id="eye-limit-x" min="0.05" max="0.06" step="0.05" value="0.05" class="w-full"></label>
+      <label class="block mb-2">眼睛Y轴旋转限制(弧度)<input type="range" id="eye-limit-y" min="0.05" max="0.06" step="0.05" value="0.05" class="w-full"></label>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">性能监控</h3>
+      <div id="performance-panel" class="space-y-2">
+        <div id="fps-display" class="text-sm font-mono">FPS: --</div>
+        <div id="memory-display" class="text-sm font-mono">内存: --</div>
+        <div id="api-display" class="text-sm font-mono">API调用: --</div>
+        <div class="flex gap-2 mt-2">
+          <button id="clear-performance" class="flex-1 p-2 bg-gray-500 text-white rounded text-sm">清空统计</button>
+          <button id="toggle-performance" class="flex-1 p-2 bg-blue-500 text-white rounded text-sm">显示/隐藏</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 增强功能：角色配置 -->
+    <div class="control-group">
+      <h3 class="text-xl">🎭 角色配置</h3>
+      <div class="control-buttons">
+        <button onclick="switchCharacterProfile('default')" class="bg-blue-500">EVA001</button>
+        <button onclick="switchCharacterProfile('shy')" class="bg-pink-500">小羞</button>
+        <button onclick="switchCharacterProfile('energetic')" class="bg-orange-500">元气</button>
+      </div>
+    </div>
+    
+    <!-- 增强功能：场景效果 -->
+    <div class="control-group">
+      <h3 class="text-xl">🌅 场景氛围</h3>
+      <div class="control-buttons">
+        <button onclick="switchScene('default')" class="bg-gray-500">默认</button>
+        <button onclick="switchScene('night')" class="bg-indigo-900">夜晚</button>
+        <button onclick="switchScene('sunset')" class="bg-orange-600">日落</button>
+        <button onclick="switchScene('warm')" class="bg-yellow-500">温暖</button>
+      </div>
+    </div>
+    
+    <!-- 增强功能：对话分析 -->
+    <div class="control-group">
+      <h3 class="text-xl">📊 对话分析</h3>
+      <div class="control-buttons">
+        <button onclick="showConversationAnalytics()" class="bg-purple-500">查看统计</button>
+        <button onclick="showMessageSuggestions()" class="bg-green-500">消息建议</button>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <h3 class="text-xl">骨骼控制</h3>
+      <div id="bone-controls" class="bone-controls">
+        <p class="text-center text-gray-500">加载VRM模型后，这里将显示骨骼控制选项</p>
+      </div>
+    </div>
+  </div>
+  
+</main>
+</div>
+
+<script>
+let OLLAMA_API = "http://127.0.0.1:11434";
+let CHAT_TTS_API = "http://127.0.0.1:9966";
+let SENSEVOICE_API = "http://127.0.0.1:50000";
+
+const INITIAL_POSE = {
+  leftUpperArm: { x: 0.3, y: 1, z: 1 },
+  leftLowerArm: { x: 0.2, y: 0.6, z: 0 },
+  leftHand: { x: 0, y: 0.5, z: 0 },
+  
+  rightUpperArm: { x: 0.3, y: -1, z: -1 },
+  rightLowerArm: { x: 0.2, y: -0.6, z: 0 },
+  rightHand: { x: 0, y: -0.5, z: 0 },
+  
+  leftUpperLeg: { x: 0, y: 0, z: 0 },
+  leftLowerLeg: { x: 0, y: 0, z: 0 },
+  leftFoot: { x: 0, y: 0, z: 0 },
+  
+  rightUpperLeg: { x: 0, y: 0, z: 0 },
+  rightLowerLeg: { x: 0, y: 0, z: 0 },
+  rightFoot: { x: 0, y: 0, z: 0 },
+  
+  neck: { x: 0, y: 0, z: 0 },
+  head: { x: 0, y: 0, z: 0 }
+};
+
+let scene, camera, renderer, controls, vrm;
+let directionalLight, ambientLight;
+let clock = new THREE.Clock();
+let bones = {}, restPositions = {}, restRotations = {};
+let isWalking = false, isEntering = false;
+
+let breathingEnabled = true;
+let breathIntensity = 0.3;
+
+let isSpeaking = false;
+let speakingStartTime = 0;
+let emotionState = 'neutral';
+let gestureQueue = [];
+let isPlayingGesture = false;
+
+let blinkingEnabled = true;
+let blinkInterval = 7;
+let blinkSpeed = 0.1;
+let blinkTimer = 0;
+let isBlinking = false;
+let blinkProgress = 0;
+let eyeExpressionNames = [];
+
+let mouseX = 0, mouseY = 0;
+let headTrackingEnabled = true;
+let eyeTrackingEnabled = true;
+let headTrackingSpeed = 0.05;
+let eyeTrackingSpeed = 0.1;
+let headRotationLimits = { x: 0.3, y: 0.5 };
+let eyeRotationLimits = { x: 0.05, y: 0.06 };
+
+let ollamaUrl = OLLAMA_API;
+let ollamaModel = "gemma2:2b";
+let conversationHistory = [];
+let isConnected = false;
+
+let recognition = null;
+let isListening = false;
+let voiceEnabled = false;
+let useSenseVoice = true;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+let chatTtsEnabled = true;
+let chatTtsServer = CHAT_TTS_API;
+let ttsSpeed = 5;
+let ttsTemperature = 0.3;
+let selectedVoice = "1031.pt";
+let skipRefine = true;
+
+let ttsQueue = [];
+let isPlayingTTS = false;
+let currentAudio = null;
+
+const MAX_HISTORY_LENGTH = 20;
+
+let performanceStats = {
+  fps: 0,
+  apiResponseTime: {},
+  lastUpdate: Date.now(),
+  frameCount: 0,
+  lastFpsUpdate: Date.now()
+};
+
+let characterProfiles = {
+  default: {
+    name: "EVA001",
+    personality: "友好、活泼、善解人意",
+    voice: "1031.pt",
+    systemPrompt: "你是一个友好、活泼、善解人意的AI助手，名叫EVA001。",
+    emotionSensitivity: 0.8
+  },
+  shy: {
+    name: "小羞",
+    personality: "害羞、温柔、细心",
+    voice: "2222.pt",
+    systemPrompt: "你是一个害羞、温柔、细心的AI助手，说话时经常会有些害羞。",
+    emotionSensitivity: 1.2
+  },
+  energetic: {
+    name: "元气",
+    personality: "活力充沛、热情开朗",
+    voice: "4444.pt",
+    systemPrompt: "你是一个充满活力、热情开朗的AI助手，喜欢用感叹号表达兴奋！",
+    emotionSensitivity: 0.6
+  }
+};
+let currentProfile = 'default';
+
+let audioContext = null;
+let backgroundMusic = null;
+let soundEffects = {
+  messageReceived: null,
+  messageSent: null,
+  notification: null
+};
+let isMusicEnabled = false;
+let musicVolume = 0.3;
+
+let particleSystem = null;
+let currentScene = 'default';
+let postProcessing = {
+  bloom: false,
+  vignette: false,
+  colorGrading: 'none'
+};
+
+let conversationAnalytics = {
+  totalMessages: 0,
+  userMessages: 0,
+  aiMessages: 0,
+  averageResponseTime: 0,
+  topKeywords: {},
+  emotionDistribution: { happy: 0, sad: 0, neutral: 0, angry: 0, surprised: 0 },
+  sessionStartTime: Date.now(),
+  longestConversation: 0
+};
+
+let keyboardShortcuts = {
+  'ctrl+m': toggleVoice,
+  'ctrl+s': () => exportConversation('txt'),
+  'ctrl+shift+s': () => exportConversation('json'),
+  'ctrl+l': () => document.getElementById('clear-chat').click(),
+  'ctrl+space': () => document.getElementById('chat-input').focus(),
+  'escape': stopTTS
+};
+
+let voiceEmotionAnalysis = {
+  enabled: true,
+  lastAnalysis: null,
+  history: []
+};
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function throttle(func, limit) {
+  let inThrottle;
+  return function() {
+    const args = arguments;
+    const context = this;
+    if (!inThrottle) {
+      func.apply(context, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+面板
+function updatePerformanceStats() {
+  performanceStats.frameCount++;
+  const now = Date.now();
+  
+  if (now - performanceStats.lastFpsUpdate >= 1000) {
+    performanceStats.fps = Math.round((performanceStats.frameCount * 1000) / (now - performanceStats.lastFpsUpdate));
+    performanceStats.frameCount = 0;
+    performanceStats.lastFpsUpdate = now;
+  }
+  
+  updatePerformancePanel();
+}
+
+function updatePerformancePanel() {
+  const panel = document.getElementById('performance-panel');
+  if (!panel) return;
+  
+  const fpsElement = panel.querySelector('#fps-display');
+  const memoryElement = panel.querySelector('#memory-display');
+  const apiElement = panel.querySelector('#api-display');
+  
+  if (fpsElement) {
+    fpsElement.textContent = `FPS: ${performanceStats.fps}`;
+    fpsElement.className = performanceStats.fps < 30 ? 'text-red-500' : 
+                          performanceStats.fps < 50 ? 'text-yellow-500' : 'text-green-500';
+  }
+  
+  if (memoryElement) {
+    if (performance.memory) {
+      const used = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+      const total = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024);
+      memoryElement.textContent = `内存: ${used}MB / ${total}MB`;
+    } else {
+      memoryElement.textContent = '内存: 不支持';
+    }
+  }
+  
+  if (apiElement) {
+    const apiCount = Object.keys(performanceStats.apiResponseTime).length;
+    apiElement.textContent = `API调用: ${apiCount} 次`;
+  }
+}
+
+function recordApiResponseTime(apiName, startTime) {
+  const responseTime = Date.now() - startTime;
+  performanceStats.apiResponseTime[apiName] = responseTime;
+  performanceStats.lastUpdate = Date.now();
+}
+
+async function shareDemo() {
+  try {
+    const canvas = document.getElementById('vrm-viewer');
+    const dataURL = canvas.toDataURL('image/png');
+    
+    const shareData = {
+      title: 'AI-EVA Demo - AI虚拟女友对话系统',
+      text: '体验最新的AI虚拟女友对话系统，支持语音交互、3D角色、情感表达！',
+      url: window.location.href
+    };
+    
+    if (navigator.share) {
+      await navigator.share(shareData);
+    } else {
+      await navigator.clipboard.writeText(shareData.url);
+      addMsg("系统", "链接已复制到剪贴板");
+    }
+  } catch (error) {
+    console.error('分享失败:', error);
+    addMsg("系统", "分享功能暂不可用");
+  }
+}
+
+function startTutorial() {
+  addMsg("系统", "🎭 欢迎使用 AI-EVA Demo！");
+  addMsg("系统", "📝 教程开始：请按照以下步骤操作");
+  
+  setTimeout(() => {
+    addMsg("系统", "步骤1：请拖拽一个 VRM 模型文件到界面中");
+    highlightElement('vrm-drop-zone');
+  }, 1000);
+  
+  setTimeout(() => {
+    addMsg("系统", "步骤2：点击右上角设置按钮配置 AI 模型");
+    highlightElement('open-settings');
+  }, 3000);
+  
+  setTimeout(() => {
+    addMsg("系统", "步骤3：在输入框中输入消息开始对话");
+    highlightElement('chat-input');
+  }, 5000);
+  
+  setTimeout(() => {
+    addMsg("系统", "步骤4：点击麦克风按钮体验语音交互");
+    highlightElement('voice-input-btn');
+  }, 7000);
+  
+  setTimeout(() => {
+    addMsg("系统", "🎉 教程完成！现在你可以自由探索所有功能了");
+    removeAllHighlights();
+  }, 9000);
+}
+
+function highlightElement(elementId) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    element.style.outline = '3px solid #ff6b6b';
+    element.style.outlineOffset = '2px';
+    element.style.transition = 'outline 0.3s ease';
+  }
+}
+
+function removeAllHighlights() {
+  const elements = document.querySelectorAll('[style*="outline"]');
+  elements.forEach(el => {
+    el.style.outline = '';
+    el.style.outlineOffset = '';
+  });
+}
+
+function checkTutorial() {
+  const tutorialSkipped = localStorage.getItem('ai-eva-tutorial-skipped');
+  if (!tutorialSkipped) {
+    document.getElementById('tutorial-overlay').style.display = 'flex';
+  }
+}
+
+function initApiSettings() {
+  const savedOllamaUrl = localStorage.getItem('ollama-url') || "http://127.0.0.1:11434";
+  const savedChatTtsUrl = localStorage.getItem('chat-tts-url') || "http://127.0.0.1:9966";
+  const savedSensevoiceUrl = localStorage.getItem('sensevoice-url') || "http://127.0.0.1:50000";
+  
+  document.getElementById('ollama-url').value = savedOllamaUrl;
+  document.getElementById('chat-tts-url').value = savedChatTtsUrl;
+  document.getElementById('sensevoice-url').value = savedSensevoiceUrl;
+  
+  OLLAMA_API = savedOllamaUrl;
+  CHAT_TTS_API = savedChatTtsUrl;
+  SENSEVOICE_API = savedSensevoiceUrl;
+  
+  document.getElementById('ollama-url').addEventListener('change', function() {
+    OLLAMA_API = this.value;
+    localStorage.setItem('ollama-url', OLLAMA_API);
+    console.log('Ollama服务器地址已更新为: ' + OLLAMA_API);
+    addMsg("系统", `Ollama服务器地址已更新为: ${OLLAMA_API}`);
+  });
+  
+  document.getElementById('chat-tts-url').addEventListener('change', function() {
+    CHAT_TTS_API = this.value;
+    localStorage.setItem('chat-tts-url', CHAT_TTS_API);
+    console.log('ChatTTS服务器地址已更新为: ' + CHAT_TTS_API);
+    addMsg("系统", `ChatTTS服务器地址已更新为: ${CHAT_TTS_API}`);
+  });
+  
+  document.getElementById('sensevoice-url').addEventListener('change', function() {
+    SENSEVOICE_API = this.value;
+    localStorage.setItem('sensevoice-url', SENSEVOICE_API);
+    console.log('SenseVoice服务器地址已更新为: ' + SENSEVOICE_API);
+    addMsg("系统", `SenseVoice服务器地址已更新为: ${SENSEVOICE_API}`);
+  });
+  
+  document.getElementById('save-api-config').addEventListener('click', function() {
+    localStorage.setItem('ollama-url', OLLAMA_API);
+    localStorage.setItem('chat-tts-url', CHAT_TTS_API);
+    localStorage.setItem('sensevoice-url', SENSEVOICE_API);
+    
+    addMsg("系统", "API配置已保存到本地存储");
+    
+    this.innerHTML = '<span class="material-icons-round">check</span>已保存';
+    this.style.backgroundColor = '#10b981';
+    
+    setTimeout(() => {
+      this.innerHTML = '<span class="material-icons-round">save</span>保存配置';
+      this.style.backgroundColor = '#8b5cf6';
+    }, 2000);
+  });
+  
+  document.getElementById('test-all-connections').addEventListener('click', testAllConnections);
+  
+  document.getElementById('test-ai-voice').addEventListener('click', function() {
+    testChatTTSConnection().then(connected => {
+      if (connected) {
+        playAIResponse("你好，这是一个测试消息");
+      } else {
+        addMsg("系统", "ChatTTS服务器未连接，请先启动ChatTTS服务器");
+      }
+    });
+  });
+}
+
+async function testAllConnections() {
+  const resultsDiv = document.getElementById('connection-results');
+  resultsDiv.innerHTML = '<div class="text-blue-500">正在测试连接...</div>';
+  
+  let ollamaStatus = await testOllamaConnection();
+  let chatTtsStatus = await testChatTTSConnection();
+  
+  let html = '<div class="mt-2 space-y-1">';
+  html += `<div class="${ollamaStatus ? 'text-green-500' : 'text-red-500'}">Ollama: ${ollamaStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
+  html += `<div class="${chatTtsStatus ? 'text-green-500' : 'text-red-500'}">ChatTTS: ${chatTtsStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
+  html += '</div>';
+  
+  resultsDiv.innerHTML = html;
+  
+  if (ollamaStatus && chatTtsStatus) {
+    updateConnectionStatus(true, "AI+TTS已连接");
+  } else if (ollamaStatus) {
+    updateConnectionStatus(true, "AI已连接，TTS未连接");
+  } else if (chatTtsStatus) {
+    updateConnectionStatus(false, "TTS已连接，AI未连接");
+  } else {
+    updateConnectionStatus(false, "未连接");
+  }
+}
+
+async function testOllamaConnection() {
+  try {
+    const response = await fetch(`${ollamaUrl}/api/tags`);
+    if (response.ok) {
+      console.log("✅ Ollama 服务器连接成功");
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn("❌ Ollama 服务器连接失败:", error);
+    return false;
+  }
+}
+
+async function testChatTTSConnection() {
+  try {
+    const response = await fetch(`${chatTtsServer}/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("✅ ChatTTS 服务器连接成功:", data);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.warn("❌ ChatTTS 服务器连接失败:", error);
+    return false;
+  }
+}
+
+async function playAIResponse(promptText) {
+  try {
+    const ollamaRes = await fetch(`${ollamaUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: ollamaModel, prompt: promptText })
+    });
+    const ollamaData = await ollamaRes.json();
+    const text = ollamaData.response || promptText;
+    console.log("🤖 Ollama 生成文本:", text);
+
+    await chatTTS(text);
+
+  } catch (err) {
+    console.error("❌ 播放 AI 语音失败:", err);
+  }
+}
+
+async function initOllamaConnection() {
+  const success = await testOllamaConnection();
+  
+  if (success) {
+    isConnected = true;
+    updateConnectionStatus(true, "已连接");
+    console.log("Ollama连接成功");
+    addMsg("系统", "Ollama连接成功");
+  } else {
+    isConnected = false;
+    updateConnectionStatus(false, "连接失败");
+    console.error("Ollama连接失败");
+    addMsg("系统", "Ollama连接失败，请检查服务器地址和端口");
+  }
+}
+
+function updateConnectionStatus(connected, message) {
+  const statusElement = document.getElementById('connection-status');
+  if (connected) {
+    statusElement.textContent = message;
+    statusElement.className = "text-xs px-2 py-1 rounded-full bg-green-500 text-white";
+  } else {
+    statusElement.textContent = message;
+    statusElement.className = "text-xs px-2 py-1 rounded-full bg-red-500 text-white";
+  }
+}
+
+function showTTSIndicator(message, isComplete = false) {
+  const indicator = document.getElementById('tts-indicator');
+  const statusText = document.getElementById('tts-status-text');
+  
+  if (indicator && statusText) {
+    statusText.textContent = message;
+    indicator.style.display = 'flex';
+    
+    if (isComplete) {
+      setTimeout(() => {
+        indicator.style.display = 'none';
+      }, 3000);
+    }
+  }
+}
+
+function saveConversationHistory() {
+  try {
+    localStorage.setItem('ai-eva-conversation', JSON.stringify(conversationHistory));
+  } catch (e) {
+    console.warn('保存对话历史失败:', e);
+  }
+}
+
+function loadConversationHistory() {
+  try {
+    const saved = localStorage.getItem('ai-eva-conversation');
+    if (saved) {
+      conversationHistory = JSON.parse(saved);
+      renderConversationHistory();
+    }
+  } catch (e) {
+    console.warn('加载对话历史失败:', e);
+  }
+}
+
+function renderConversationHistory() {
+  const chatMessages = document.getElementById('chat-messages');
+  chatMessages.innerHTML = '';
+  
+  conversationHistory.forEach(msg => {
+    if (msg.role === 'user') {
+      addMsg("用户", msg.content, false);
+    } else if (msg.role === 'assistant') {
+      addMsg("AI助手", msg.content, false);
+    }
+  });
+}
+
+function exportConversation(format = 'txt') {
+  if (conversationHistory.length === 0) {
+    addMsg("系统", "没有对话记录可导出");
+    return;
+  }
+  
+  let content = '';
+  const timestamp = new Date().toLocaleString();
+  
+  if (format === 'txt') {
+    content = `AI-EVA 对话记录\n导出时间: ${timestamp}\n${'='.repeat(50)}\n\n`;
+    
+    conversationHistory.forEach((msg, index) => {
+      const role = msg.role === 'user' ? '用户' : 'AI助手';
+      content += `[${index + 1}] ${role}: ${msg.content}\n\n`;
+    });
+  } else if (format === 'json') {
+    content = JSON.stringify({
+      exportTime: timestamp,
+      conversation: conversationHistory
+    }, null, 2);
+  }
+  
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ai-eva-conversation-${Date.now()}.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  addMsg("系统", `对话记录已导出为 ${format.toUpperCase()} 格式`);
+}
+
+async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.warn(`操作失败，第 ${i + 1} 次重试:`, error);
+      if (i === maxRetries - 1) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+    }
+  }
+}
+
+function handleServiceDegradation(service, error) {
+  console.warn(`服务降级: ${service}`, error);
+  
+  switch(service) {
+    case 'ollama':
+      addMsg("系统", "AI对话服务暂时不可用，请检查Ollama连接");
+      break;
+    case 'chattts':
+      addMsg("系统", "语音合成服务暂时不可用，将仅显示文本回复");
+      chatTtsEnabled = false;
+      break;
+    case 'sensevoice':
+      addMsg("系统", "语音识别服务暂时不可用，将使用浏览器原生识别");
+      useSenseVoice = false;
+      break;
+  }
+}
+
+async function sendMessageToAI(message) {
+  if (!isConnected) {
+    addMsg("系统", "未连接到Ollama，请检查连接设置。");
+    return;
+  }
+  
+  conversationAnalytics.userMessages++;
+  conversationAnalytics.totalMessages++;
+  
+  extractKeywords(message);
+  
+  conversationHistory.push({ role: "user", content: message });
+  
+  if (conversationHistory.length > MAX_HISTORY_LENGTH) {
+    conversationHistory = conversationHistory.slice(-MAX_HISTORY_LENGTH);
+  }
+  
+  saveConversationHistory();
+  
+  playSound('messageSent');
+  
+  try {
+    const startTime = Date.now();
+    const response = await retryOperation(async () => {
+      return await fetch(`${ollamaUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: ollamaModel,
+          messages: conversationHistory,
+          stream: false
+        })
+      });
+    });
+    
+    const responseTime = (Date.now() - startTime) / 1000;
+    recordApiResponseTime('ollama', startTime);
+    
+    const totalResponses = conversationAnalytics.aiMessages + 1;
+    conversationAnalytics.averageResponseTime = 
+      (conversationAnalytics.averageResponseTime * conversationAnalytics.aiMessages + responseTime) / totalResponses;
+    
+    if (!response.ok) {
+      throw new Error(`HTTP错误: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const aiResponse = data.message.content;
+    
+    conversationAnalytics.aiMessages++;
+    conversationAnalytics.totalMessages++;
+    
+    extractKeywords(aiResponse);
+    
+    conversationHistory.push({ role: "assistant", content: aiResponse });
+    
+    saveConversationHistory();
+    
+    const emotion = analyzeEmotion(aiResponse);
+    setEmotionExpression(emotion);
+    
+    if (emotion === 'happy' || emotion === 'love') {
+      playGesture('wave');
+    } else if (emotion === 'sad') {
+      playGesture('shake');
+    } else if (emotion === 'surprised') {
+      playGesture('point');
+    }
+    
+    await typewriterEffect("AI助手", aiResponse);
+    
+    playSound('messageReceived');
+    
+    if (chatTtsEnabled) {
+      console.log("🤖 AI回复已生成，准备播放TTS语音...");
+      addMsg("系统", "正在生成语音...");
+      
+      showTTSIndicator("正在生成语音...");
+      
+      isSpeaking = true;
+      speakingStartTime = Date.now();
+      
+      setTimeout(async () => {
+        try {
+          const ttsResult = await chatTTS(aiResponse);
+          if (ttsResult) {
+            console.log("✅ TTS语音播放成功");
+            addMsg("系统", "语音播放完成");
+            showTTSIndicator("语音播放完成", true);
+          } else {
+            console.warn("⚠️ TTS播放失败");
+            addMsg("系统", "语音播放失败，请检查ChatTTS连接");
+            showTTSIndicator("语音播放失败", true);
+          }
+        } catch (error) {
+          console.error("❌ TTS播放错误:", error);
+          addMsg("系统", `语音播放错误: ${error.message}`);
+          showTTSIndicator("语音播放错误", true);
+        } finally {
+          isSpeaking = false;
+        }
+      }, 800);
+    } else {
+      console.log("ℹ️ TTS功能已关闭，跳过语音播放");
+      addMsg("系统", "TTS功能已关闭，仅显示文本回复");
+    }
+    
+  } catch (error) {
+    console.error("AI对话错误:", error);
+    handleServiceDegradation('ollama', error);
+    addMsg("系统", `AI对话失败: ${error.message}`);
+  }
+}
+
+function showConversationAnalytics() {
+  const report = generateConversationReport();
+  addMsg("系统", report);
+}
+
+function addToTTSQueue(text, voice = null) {
+  if (!text.trim()) return;
+  
+  ttsQueue.push({
+    text: text,
+    voice: voice || selectedVoice,
+    timestamp: Date.now()
+  });
+  
+  processTTSQueue();
+}
+
+async function processTTSQueue() {
+  if (isPlayingTTS || ttsQueue.length === 0) return;
+  
+  isPlayingTTS = true;
+  const item = ttsQueue.shift();
+  
+  try {
+    await playTTSAudio(item.text, item.voice);
+  } catch (error) {
+    console.error('TTS 播放失败:', error);
+  } finally {
+    isPlayingTTS = false;
+    if (ttsQueue.length > 0) {
+      setTimeout(processTTSQueue, 100);
+    }
+  }
+}
+
+async function chatTTS(text) {
+  if (!chatTtsEnabled || !text.trim()) return false;
+  
+  addToTTSQueue(text);
+  return true;
+}
+
+async function playTTSAudio(text, voice = null) {
+  try {
+    console.log("正在使用ChatTTS合成语音:", text);
+    
+    const currentVoice = voice || selectedVoice;
+    console.log("当前使用音色:", currentVoice);
+    
+    const startTime = Date.now();
+    const response = await retryOperation(async () => {
+      return await fetch(`${chatTtsServer}/tts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          text: text,
+          voice: currentVoice
+        })
+      });
+    });
+    
+    recordApiResponseTime('chattts', startTime);
+    
+    if (response.ok) {
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      currentAudio = new Audio(audioUrl);
+      
+      if (ttsSpeed !== 5) {
+        const speedMultiplier = ttsSpeed / 5;
+        currentAudio.playbackRate = speedMultiplier;
+      }
+      
+      currentAudio.onloadstart = () => {
+        console.log("ChatTTS音频开始加载");
+      };
+      
+      currentAudio.oncanplaythrough = () => {
+        console.log("ChatTTS音频可以播放");
+      };
+      
+      currentAudio.onerror = (err) => {
+        console.error("ChatTTS音频播放错误:", err);
+        isPlayingTTS = false;
+      };
+      
+      currentAudio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        isPlayingTTS = false;
+        currentAudio = null;
+      };
+      
+      await currentAudio.play();
+      
+      console.log("ChatTTS语音播放成功");
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('ChatTTS请求失败:', response.status, errorText);
+      addMsg("系统", `ChatTTS请求失败 (${response.status}): ${errorText}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('ChatTTS请求失败:', error);
+    handleServiceDegradation('chattts', error);
+    addMsg("系统", "ChatTTS连接失败，请检查服务器状态");
+    return false;
+  }
+}
+
+async function previewVoice(voice) {
+  const previewText = "你好，这是音色预览测试。";
+  try {
+    await playTTSAudio(previewText, voice);
+    addMsg("系统", `正在播放音色预览: ${voice}`);
+  } catch (error) {
+    console.error('音色预览失败:', error);
+    addMsg("系统", "音色预览失败，请检查服务器连接");
+  }
+}
+
+function stopTTS() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  isPlayingTTS = false;
+  ttsQueue = [];
+  addMsg("系统", "TTS 播放已停止");
+}
+
+function initChatTTSControls() {
+  document.getElementById('toggle-tts').addEventListener('click', toggleChatTTS);
+  
+  document.getElementById('voice-select').addEventListener('change', function(e) {
+    selectedVoice = e.target.value;
+    window.selectedVoice = selectedVoice;
+    console.log("音色已切换为:", selectedVoice);
+    chatTTS("音色已切换，正在测试新音色效果");
+  });
+  
+  document.getElementById('tts-speed').addEventListener('input', function(e) {
+    ttsSpeed = parseInt(e.target.value);
+    document.getElementById('speed-value').textContent = ttsSpeed;
+    console.log("语速已设置为:", ttsSpeed);
+  });
+  
+  document.getElementById('tts-temperature').addEventListener('input', function(e) {
+    ttsTemperature = parseFloat(e.target.value);
+    document.getElementById('temperature-value').textContent = ttsTemperature.toFixed(1);
+    console.log("Temperature已设置为:", ttsTemperature);
+  });
+  
+  document.getElementById('skip-refine').addEventListener('change', function(e) {
+    skipRefine = e.target.checked;
+    console.log("跳过refine text:", skipRefine);
+  });
+  
+  document.getElementById('test-tts').addEventListener('click', function() {
+    chatTTS("你好！这是ChatTTS语音测试。我正在使用文本转语音功能与你对话。");
+  });
+  
+  document.getElementById('preview-voice').addEventListener('click', function() {
+    const voiceSelect = document.getElementById('voice-select');
+    const currentVoice = voiceSelect ? voiceSelect.value : selectedVoice;
+    previewVoice(currentVoice);
+  });
+  
+  document.getElementById('stop-tts').addEventListener('click', stopTTS);
+  
+  document.getElementById('test-ai-tts-flow').addEventListener('click', function() {
+    addMsg("系统", "开始测试AI对话+TTS完整流程...");
+    sendMessage("你好，请简单介绍一下你自己");
+  });
+}
+
+function toggleChatTTS() {
+  chatTtsEnabled = !chatTtsEnabled;
+  const btn = document.getElementById('toggle-tts');
+  
+  if (chatTtsEnabled) {
+    btn.innerHTML = '<span class="material-icons">volume_up</span><span>TTS:开</span>';
+    btn.className = 'bg-blue-500';
+    addMsg("系统", "ChatTTS语音功能已开启 - AI回复将自动播放语音");
+  } else {
+    btn.innerHTML = '<span class="material-icons">volume_off</span><span>TTS:关</span>';
+    btn.className = 'bg-gray-500';
+    addMsg("系统", "ChatTTS语音功能已关闭 - AI回复仅显示文本");
+  }
+}
+
+async function typewriterEffect(sender, text, speed = 30) {
+  const chatMessages = document.getElementById('chat-messages');
+  const messageContainer = document.createElement('div');
+  
+  if (sender === '用户') {
+    messageContainer.className = 'message-container user-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.textContent = text;
+    messageContainer.appendChild(bubble);
+  } else if (sender === 'AI助手') {
+    messageContainer.className = 'message-container ai-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = '<span id="typing-text"></span><span id="typing-cursor">|</span>';
+    messageContainer.appendChild(bubble);
+  } else {
+    messageContainer.className = 'message-container system-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = text;
+    messageContainer.appendChild(bubble);
+  }
+  
+  chatMessages.appendChild(messageContainer);
+  
+  if (sender === 'AI助手') {
+    const typingText = document.getElementById('typing-text');
+    const cursor = document.getElementById('typing-cursor');
+    
+    for (let i = 0; i <= text.length; i++) {
+      typingText.textContent = text.substring(0, i);
+      await new Promise(resolve => setTimeout(resolve, speed));
+    }
+    
+    if (cursor) cursor.remove();
+  }
+  
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function senseVoiceRecognition(audioBlob) {
+  try {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'audio.wav');
+    formData.append('language', 'auto');
+    
+    const startTime = Date.now();
+    const response = await retryOperation(async () => {
+      return await fetch(`${SENSEVOICE_API}/api/v1/asr`, {
+        method: 'POST',
+        body: formData
+      });
+    });
+    
+    recordApiResponseTime('sensevoice', startTime);
+    
+    if (response.ok) {
+      const result = await response.json();
+      return result.text || '';
+    } else {
+      throw new Error(`SenseVoice 请求失败: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('SenseVoice 识别失败:', error);
+    handleServiceDegradation('sensevoice', error);
+    return null;
+  }
+}
+
+async function startAudioRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    
+    mediaRecorder.ondataavailable = event => {
+      audioChunks.push(event.data);
+    };
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      
+      const text = await senseVoiceRecognition(audioBlob);
+      if (text) {
+        document.getElementById('voice-text').textContent = text;
+        setTimeout(() => {
+          document.getElementById('voice-indicator').style.display = 'none';
+          document.getElementById('chat-input').value = text;
+          sendMessage(text);
+          document.getElementById('voice-text').textContent = '';
+        }, 1000);
+      } else {
+        addMsg("系统", "语音识别失败，请重试");
+        document.getElementById('voice-indicator').style.display = 'none';
+      }
+      
+      stream.getTracks().forEach(track => track.stop());
+    };
+    
+    mediaRecorder.start();
+    isRecording = true;
+    
+    document.getElementById('voice-indicator').style.display = 'block';
+    document.getElementById('toggle-voice').innerHTML = '<span class="material-icons-round">mic</span>语音输入:录制中';
+    document.getElementById('toggle-voice').className = 'active';
+    
+  } catch (error) {
+    console.error('启动录音失败:', error);
+    addMsg("系统", "无法访问麦克风，请检查权限设置");
+  }
+}
+
+function stopAudioRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+  }
+  
+  document.getElementById('voice-indicator').style.display = 'none';
+  
+  const btn = document.getElementById('toggle-voice');
+  btn.innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+  btn.className = '';
+}
+
+function initVoiceRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    console.warn("该浏览器不支持语音识别");
+    addMsg("系统", "您的浏览器不支持语音识别功能。");
+    return false;
+  }
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'zh-CN';
+  
+  recognition.onstart = function() {
+    console.log("语音识别开始");
+    isListening = true;
+    document.getElementById('voice-indicator').style.display = 'block';
+    document.getElementById('toggle-voice').innerHTML = '<span class="material-icons-round">mic</span>语音输入:监听中';
+    document.getElementById('toggle-voice').className = 'active';
+  };
+  
+  recognition.onresult = function(event) {
+    let interimTranscript = '';
+    let finalTranscript = '';
+    
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript;
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+    
+    if (interimTranscript) {
+      document.getElementById('voice-text').textContent = interimTranscript;
+    }
+    
+    if (finalTranscript) {
+      console.log("识别到语音:", finalTranscript);
+      document.getElementById('voice-text').textContent = finalTranscript;
+      
+      setTimeout(() => {
+        document.getElementById('voice-indicator').style.display = 'none';
+        document.getElementById('chat-input').value = finalTranscript;
+        sendMessage(finalTranscript);
+        
+        document.getElementById('voice-text').textContent = '';
+      }, 1000);
+    }
+  };
+  
+  recognition.onerror = function(event) {
+    console.error("语音识别错误:", event.error);
+    isListening = false;
+    document.getElementById('voice-indicator').style.display = 'none';
+    document.getElementById('toggle-voice').innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+    document.getElementById('toggle-voice').className = '';
+    
+    if (event.error === 'not-allowed') {
+      addMsg("系统", "麦克风访问被拒绝，请检查浏览器权限设置。");
+    }
+  };
+  
+  recognition.onend = function() {
+    console.log("语音识别结束");
+    isListening = false;
+    
+    if (!document.getElementById('voice-text').textContent) {
+      document.getElementById('voice-indicator').style.display = 'none';
+    }
+    
+    if (voiceEnabled && !isListening) {
+      setTimeout(startListening, 500);
+    } else {
+      document.getElementById('toggle-voice').innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+      document.getElementById('toggle-voice').className = '';
+    }
+  };
+  
+  return true;
+}
+
+function startListening() {
+  if (recognition && !isListening) {
+    try {
+      recognition.start();
+    } catch (error) {
+      console.error("启动语音识别失败:", error);
+    }
+  }
+}
+
+function stopListening() {
+  if (recognition && isListening) {
+    recognition.stop();
+    isListening = false;
+  }
+  
+  document.getElementById('voice-indicator').style.display = 'none';
+  
+  const btn = document.getElementById('toggle-voice');
+  btn.innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+  btn.className = '';
+}
+
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  const btn = document.getElementById('toggle-voice');
+  
+  if (voiceEnabled) {
+    if (useSenseVoice) {
+      startAudioRecording();
+    } else {
+      if (!recognition && !initVoiceRecognition()) {
+        voiceEnabled = false;
+        btn.innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+        btn.className = '';
+        return;
+      }
+      startListening();
+    }
+  } else {
+    if (useSenseVoice) {
+      stopAudioRecording();
+    } else {
+      stopListening();
+    }
+    
+    btn.innerHTML = '<span class="material-icons-round">mic</span>语音输入:关';
+    btn.className = '';
+    
+    document.getElementById('voice-indicator').style.display = 'none';
+  }
+}
+
+function initScene(){
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0,1.3,2);
+  renderer = new THREE.WebGLRenderer({canvas:document.getElementById('vrm-viewer'),antialias:true,alpha:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+
+  directionalLight = new THREE.DirectionalLight(0xffffff,0.7);
+  directionalLight.position.set(1,1,1);
+  scene.add(directionalLight);
+  ambientLight = new THREE.AmbientLight(0xffffff,0.4);
+  scene.add(ambientLight);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0,1.2,0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.update();
+
+  animate();
+}
+
+// 应用初始状态函数
+function applyInitialPose() {
+  for (const boneName in INITIAL_POSE) {
+    if (bones[boneName] && restRotations[boneName]) {
+      const initialRotation = INITIAL_POSE[boneName];
+      
+      // 应用初始旋转（基于restRotations的偏移）
+      bones[boneName].rotation.x = restRotations[boneName].x + initialRotation.x;
+      bones[boneName].rotation.y = restRotations[boneName].y + initialRotation.y;
+      bones[boneName].rotation.z = restRotations[boneName].z + initialRotation.z;
+      
+      // 更新restRotations以包含初始状态（这样UI控制会基于初始状态）
+      restRotations[boneName].x += initialRotation.x;
+      restRotations[boneName].y += initialRotation.y;
+      restRotations[boneName].z += initialRotation.z;
+    }
+  }
+  console.log('初始状态已应用');
+}
+
+function loadVRM(file){
+  showLoading(true, '正在加载 VRM...');
+  const url = URL.createObjectURL(file);
+  const loader = new THREE.GLTFLoader();
+  loader.register(parser => new THREE.VRMLoaderPlugin(parser));
+
+  loader.load(url, gltf => {
+    try{
+      // 清除旧模型
+      if(vrm && vrm.scene){ try{ scene.remove(vrm.scene); }catch(e){} vrm = null; }
+
+      vrm = gltf.userData.vrm;
+      if(!vrm){ console.error('加载结果中没有 vrm 对象'); showLoading(false, '加载失败：非VRM'); URL.revokeObjectURL(url); return; }
+
+      scene.add(vrm.scene);
+      vrm.scene.position.set(0,0,0);
+      
+      // 确保模型在场景中央，面向相机
+      vrm.scene.rotation.y = 0; // 让模型面向相机（0度是面向相机）
+      
+      // 强制重置相机位置，确保模型居中
+      camera.position.set(0, 1.3, 2);
+      camera.lookAt(0, 1.2, 0);
+      controls.target.set(0, 1.2, 0);
+      controls.update();
+
+      if(vrm.humanoid){
+        const getBone = n => { try{ return vrm.humanoid.getNormalizedBoneNode(n);}catch{return null;} };
+        bones = {
+          hips:getBone('hips'), spine:getBone('spine'), chest:getBone('chest'), neck:getBone('neck'), head:getBone('head'),
+          leftUpperArm:getBone('leftUpperArm'), rightUpperArm:getBone('rightUpperArm'),
+          leftLowerArm:getBone('leftLowerArm'), rightLowerArm:getBone('rightLowerArm'),
+          leftHand:getBone('leftHand'), rightHand:getBone('rightHand'),
+          leftUpperLeg:getBone('leftUpperLeg'), rightUpperLeg:getBone('rightUpperLeg'),
+          leftLowerLeg:getBone('leftLowerLeg'), rightLowerLeg:getBone('rightLowerLeg'),
+          leftFoot:getBone('leftFoot'), rightFoot:getBone('rightFoot'),
+          leftEye: getBone('leftEye'), rightEye: getBone('rightEye')
+        };
+
+        for(const k in bones){ 
+          if(bones[k]){ 
+            restPositions[k] = bones[k].position.clone(); 
+            restRotations[k] = bones[k].rotation.clone(); 
+          } 
+        }
+
+        // ========== 应用初始状态 ==========
+        applyInitialPose();
+        // ========== 应用初始状态结束 ==========
+
+        // 初始化骨骼控制UI
+        initBoneControlsUI();
+        
+        // 检测可用的眨眼表达式名称
+        detectBlinkExpressions();
+        
+        // 初始化视线追踪
+        initMouseTracking();
+      }
+
+      startEntrance();
+      showLoading(false);
+      
+      // 更新VRM状态
+      updateServiceStatus('vrm', 'connected', 'VRM 模型已加载');
+      
+      // 显示模型控制面板
+      const modelControls = document.getElementById('model-controls');
+      if (modelControls) {
+        modelControls.style.display = 'block';
+      }
+      
+      // 初始化模型控制
+      initModelControls();
+      
+    }catch(e){ 
+      console.error('VRM load error', e); 
+      showLoading(false);
+      updateServiceStatus('vrm', 'error', 'VRM 模型加载失败');
+    }
+    URL.revokeObjectURL(url);
+  }, undefined, err=>{ 
+    console.error('GLTFLoader error', err); 
+    showLoading(false); 
+    updateServiceStatus('vrm', 'error', 'VRM 模型加载失败');
+    URL.revokeObjectURL(url); 
+  });
+}
+
+// 检测可用的眨眼表达式名称
+function detectBlinkExpressions() {
+  if (!vrm || !vrm.expressionManager) return;
+  
+  // VRM 1.0 的标准眨眼表达式名称
+  const possibleBlinkNames = [
+    'blink', 'blinkLeft', 'blinkRight', 'Blink', 'Blink_L', 'Blink_R',
+    'eyeBlink', 'eyeBlinkLeft', 'eyeBlinkRight'
+  ];
+  
+  eyeExpressionNames = [];
+  
+  try {
+    // 获取所有可用的表达式
+    const expressions = vrm.expressionManager.expressions || [];
+    console.log('可用的表达式:', expressions);
+    
+    // 查找可能的眨眼表达式
+    for (const name of possibleBlinkNames) {
+      if (vrm.expressionManager.getExpression(name) !== undefined) {
+        eyeExpressionNames.push(name);
+        console.log('找到眨眼表达式:', name);
+      }
+    }
+    
+    // 如果没有找到特定的眨眼表达式，尝试使用所有可用的
+    if (eyeExpressionNames.length === 0) {
+      console.log('未找到特定的眨眼表达式，尝试使用所有可用的表达式');
+      for (const expr of expressions) {
+        if (expr.name && (expr.name.toLowerCase().includes('blink') || expr.name.toLowerCase().includes('eye'))) {
+          eyeExpressionNames.push(expr.name);
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('无法获取表达式信息', e);
+  }
+}
+
+// 设置眨眼表达式值
+function setBlinkValue(value) {
+  if (!vrm || !vrm.expressionManager || eyeExpressionNames.length === 0) return;
+  
+  for (const name of eyeExpressionNames) {
+    try {
+      vrm.expressionManager.setValue(name, value);
+    } catch(e) {
+      console.warn(`设置表达式 ${name} 失败:`, e);
+    }
+  }
+}
+
+function initBoneControlsUI() {
+  const container = document.getElementById('bone-controls');
+  container.innerHTML = '';
+  
+  // 定义可控制的骨骼组
+  const boneGroups = {
+    '脖子控制': ['neck'],
+    '头部控制': ['head'],
+    '左臂控制': ['leftUpperArm', 'leftLowerArm', 'leftHand'],
+    '右臂控制': ['rightUpperArm', 'rightLowerArm', 'rightHand'],
+    '左腿控制': ['leftUpperLeg', 'leftLowerLeg', 'leftFoot'],
+    '右腿控制': ['rightUpperLeg', 'rightLowerLeg', 'rightFoot']
+  };
+  
+  // 为每个骨骼组创建控制UI
+  for (const [groupName, boneNames] of Object.entries(boneGroups)) {
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'bone-control-group';
+    
+    const title = document.createElement('h4');
+    title.textContent = groupName;
+    groupDiv.appendChild(title);
+    
+    for (const boneName of boneNames) {
+      if (!bones[boneName]) continue;
+      
+      // 根据骨骼名称创建不同的控制方式
+      if (boneName === 'neck') {
+        // 脖子特殊控制 - XY轴旋转
+        const xControlDiv = document.createElement('div');
+        xControlDiv.className = 'slider-container';
+        
+        const xLabel = document.createElement('label');
+        xLabel.textContent = `${boneName} X轴旋转:`;
+        xControlDiv.appendChild(xLabel);
+        
+        const xSlider = document.createElement('input');
+        xSlider.type = 'range';
+        xSlider.min = '-0.5';
+        xSlider.max = '0.5';
+        xSlider.step = '0.01';
+        xSlider.value = '0';
+        xSlider.className = 'w-full';
+        xSlider.dataset.bone = boneName;
+        xSlider.dataset.axis = 'x';
+        
+        xSlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.x = restRotations[this.dataset.bone].x + value;
+          }
+        });
+        
+        xControlDiv.appendChild(xSlider);
+        groupDiv.appendChild(xControlDiv);
+        
+        const yControlDiv = document.createElement('div');
+        yControlDiv.className = 'slider-container';
+        
+        const yLabel = document.createElement('label');
+        yLabel.textContent = `${boneName} Y轴旋转:`;
+        yControlDiv.appendChild(yLabel);
+        
+        const ySlider = document.createElement('input');
+        ySlider.type = 'range';
+        ySlider.min = '-0.5';
+        ySlider.max = '0.5';
+        ySlider.step = '0.01';
+        ySlider.value = '0';
+        ySlider.className = 'w-full';
+        ySlider.dataset.bone = boneName;
+        ySlider.dataset.axis = 'y';
+        
+        ySlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.y = restRotations[this.dataset.bone].y + value;
+          }
+        });
+        
+        yControlDiv.appendChild(ySlider);
+        groupDiv.appendChild(yControlDiv);
+      } 
+      else if (boneName.includes('Arm')) {
+        // 手臂控制 - 多轴旋转和预设动作
+        const presetDiv = document.createElement('div');
+        presetDiv.className = 'button-group';
+        
+        const presetLabel = document.createElement('label');
+        presetLabel.textContent = `${boneName} 预设动作:`;
+        presetLabel.style.minWidth = '120px';
+        presetDiv.appendChild(presetLabel);
+        
+        const presetButtons = [
+          { text: '自然', value: 'natural' },
+          { text: '抬起', value: 'raise' },
+          { text: '落下', value: 'lower' },
+          { text: '向前', value: 'forward' },
+          { text: '向后', value: 'backward' }
+        ];
+        
+        presetButtons.forEach(preset => {
+          const button = document.createElement('button');
+          button.textContent = preset.text;
+          button.dataset.bone = boneName;
+          button.dataset.preset = preset.value;
+          button.addEventListener('click', function() {
+            applyArmPreset(this.dataset.bone, this.dataset.preset);
+            
+            presetDiv.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+          });
+          
+          if (preset.value === 'natural') {
+            button.classList.add('active');
+          }
+          
+          presetDiv.appendChild(button);
+        });
+        
+        groupDiv.appendChild(presetDiv);
+        
+        // 手臂精细控制
+        const xControlDiv = document.createElement('div');
+        xControlDiv.className = 'slider-container';
+        
+        const xLabel = document.createElement('label');
+        xLabel.textContent = `${boneName} X轴旋转:`;
+        xControlDiv.appendChild(xLabel);
+        
+        const xSlider = document.createElement('input');
+        xSlider.type = 'range';
+        xSlider.min = '-1.5';
+        xSlider.max = '1.5';
+        xSlider.step = '0.05';
+        xSlider.value = '0';
+        xSlider.className = 'w-full';
+        xSlider.dataset.bone = boneName;
+        xSlider.dataset.axis = 'x';
+        
+        xSlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.x = restRotations[this.dataset.bone].x + value;
+            
+            presetDiv.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+          }
+        });
+        
+        xControlDiv.appendChild(xSlider);
+        groupDiv.appendChild(xControlDiv);
+        
+        const yControlDiv = document.createElement('div');
+        yControlDiv.className = 'slider-container';
+        
+        const yLabel = document.createElement('label');
+        yLabel.textContent = `${boneName} Y轴旋转:`;
+        yControlDiv.appendChild(yLabel);
+        
+        const ySlider = document.createElement('input');
+        ySlider.type = 'range';
+        ySlider.min = '-1.5';
+        ySlider.max = '1.5';
+        ySlider.step = '0.05';
+        ySlider.value = '0';
+        ySlider.className = 'w-full';
+        ySlider.dataset.bone = boneName;
+        ySlider.dataset.axis = 'y';
+        
+        ySlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.y = restRotations[this.dataset.bone].y + value;
+            
+            presetDiv.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+          }
+        });
+        
+        yControlDiv.appendChild(ySlider);
+        groupDiv.appendChild(yControlDiv);
+        
+        const zControlDiv = document.createElement('div');
+        zControlDiv.className = 'slider-container';
+        
+        const zLabel = document.createElement('label');
+        zLabel.textContent = `${boneName} Z轴旋转:`;
+        zControlDiv.appendChild(zLabel);
+        
+        const zSlider = document.createElement('input');
+        zSlider.type = 'range';
+        zSlider.min = '-1.5';
+        zSlider.max = '1.5';
+        zSlider.step = '0.05';
+        zSlider.value = '0';
+        zSlider.className = 'w-full';
+        zSlider.dataset.bone = boneName;
+        zSlider.dataset.axis = 'z';
+        
+        zSlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.z = restRotations[this.dataset.bone].z + value;
+            
+            presetDiv.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+          }
+        });
+        
+        zControlDiv.appendChild(zSlider);
+        groupDiv.appendChild(zControlDiv);
+      } 
+      else {
+        // 其他骨骼的通用控制
+        const xControlDiv = document.createElement('div');
+        xControlDiv.className = 'slider-container';
+        
+        const xLabel = document.createElement('label');
+        xLabel.textContent = `${boneName} X轴旋转:`;
+        xControlDiv.appendChild(xLabel);
+        
+        const xSlider = document.createElement('input');
+        xSlider.type = 'range';
+        xSlider.min = '-1';
+        xSlider.max = '1';
+        xSlider.step = '0.05';
+        xSlider.value = '0';
+        xSlider.className = 'w-full';
+        xSlider.dataset.bone = boneName;
+        xSlider.dataset.axis = 'x';
+        
+        xSlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.x = restRotations[this.dataset.bone].x + value;
+          }
+        });
+        
+        xControlDiv.appendChild(xSlider);
+        groupDiv.appendChild(xControlDiv);
+        
+        const yControlDiv = document.createElement('div');
+        yControlDiv.className = 'slider-container';
+        
+        const yLabel = document.createElement('label');
+        yLabel.textContent = `${boneName} Y轴旋转:`;
+        yControlDiv.appendChild(yLabel);
+        
+        const ySlider = document.createElement('input');
+        ySlider.type = 'range';
+        ySlider.min = '-1';
+        ySlider.max = '1';
+        ySlider.step = '0.05';
+        ySlider.value = '0';
+        ySlider.className = 'w-full';
+        ySlider.dataset.bone = boneName;
+        ySlider.dataset.axis = 'y';
+        
+        ySlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.y = restRotations[this.dataset.bone].y + value;
+          }
+        });
+        
+        yControlDiv.appendChild(ySlider);
+        groupDiv.appendChild(yControlDiv);
+        
+        const zControlDiv = document.createElement('div');
+        zControlDiv.className = 'slider-container';
+        
+        const zLabel = document.createElement('label');
+        zLabel.textContent = `${boneName} Z轴旋转:`;
+        zControlDiv.appendChild(zLabel);
+        
+        const zSlider = document.createElement('input');
+        zSlider.type = 'range';
+        zSlider.min = '-1';
+        zSlider.max = '1';
+        zSlider.step = '0.05';
+        zSlider.value = '0';
+        zSlider.className = 'w-full';
+        zSlider.dataset.bone = boneName;
+        zSlider.dataset.axis = 'z';
+        
+        zSlider.addEventListener('input', function(e) {
+          const value = parseFloat(e.target.value);
+          const bone = bones[this.dataset.bone];
+          if (bone) {
+            bone.rotation.z = restRotations[this.dataset.bone].z + value;
+          }
+        });
+        
+        zControlDiv.appendChild(zSlider);
+        groupDiv.appendChild(zControlDiv);
+      }
+    }
+    
+    container.appendChild(groupDiv);
+  }
+}
+
+function applyArmPreset(boneName, preset) {
+  const bone = bones[boneName];
+  if (!bone) return;
+  
+  // 重置到初始状态
+  bone.rotation.copy(restRotations[boneName]);
+  
+  // 应用预设动作
+  switch(preset) {
+    case 'natural':
+      // 自然状态 - 已经重置
+      break;
+    case 'raise':
+      // 抬起 - 增加X轴旋转
+      bone.rotation.x += 0.8;
+      break;
+    case 'lower':
+      // 落下 - 减少X轴旋转
+      bone.rotation.x -= 0.5;
+      break;
+    case 'forward':
+      // 向前 - 增加Y轴旋转
+      bone.rotation.y += 0.5;
+      break;
+    case 'backward':
+      // 向后 - 减少Y轴旋转
+      bone.rotation.y -= 0.5;
+      break;
+  }
+  
+  // 更新相关骨骼
+  if (boneName === 'leftUpperArm' && bones.leftLowerArm) {
+    bones.leftLowerArm.rotation.copy(restRotations.leftLowerArm);
+    if (preset === 'raise') bones.leftLowerArm.rotation.x += 0.3;
+  }
+  if (boneName === 'rightUpperArm' && bones.rightLowerArm) {
+    bones.rightLowerArm.rotation.copy(restRotations.rightLowerArm);
+    if (preset === 'raise') bones.rightLowerArm.rotation.x += 0.3;
+  }
+}
+
+function startEntrance(){
+  isEntering = true; isWalking = true;
+  const startPos = new THREE.Vector3(8,0,0);
+  const endPos = new THREE.Vector3(0,0,0);
+  const duration = 800; const startTime = performance.now();
+  (function step(){ if(!vrm) return; const t = Math.min((performance.now()-startTime)/duration,1); vrm.scene.position.lerpVectors(startPos,endPos,t); if(t<1) requestAnimationFrame(step); else { isEntering=false; isWalking=false; } })();
+}
+
+function updateBreathing(delta){
+  if(!breathingEnabled || !vrm) return;
+  const time = performance.now()*0.001; 
+  const breath = Math.sin(time * 1.5) * breathIntensity * 0.05;
+  
+  if(bones.chest) bones.chest.rotation.x = (restRotations.chest ? restRotations.chest.x : 0) + breath * 0.35;
+  if(bones.neck) bones.neck.rotation.x = (restRotations.neck ? restRotations.neck.x : 0) + breath * 0.2;
+  if(bones.head) bones.head.rotation.x = (restRotations.head ? restRotations.head.x : 0) + breath * 0.1;
+}
+
+// 更新眨眼动画
+function updateBlinking(delta) {
+  if (!blinkingEnabled || !vrm) return;
+  
+  // 更新计时器
+  blinkTimer += delta;
+  
+  // 如果不在眨眼过程中且达到间隔时间，开始眨眼
+  if (!isBlinking && blinkTimer >= blinkInterval) {
+    isBlinking = true;
+    blinkProgress = 0;
+    blinkTimer = 0;
+  }
+  
+  // 如果在眨眼过程中，更新眨眼进度
+  if (isBlinking) {
+    blinkProgress += delta / blinkSpeed;
+    
+    if (blinkProgress < 0.5) {
+      // 眨眼闭合阶段 (0-0.5)
+      const closeValue = blinkProgress * 2; // 0到1
+      setBlinkValue(closeValue);
+    } else if (blinkProgress < 1) {
+      // 眨眼睁开阶段 (0.5-1)
+      const openValue = 1 - (blinkProgress - 0.5) * 2; // 1到0
+      setBlinkValue(openValue);
+    } else {
+      // 眨眼完成
+      isBlinking = false;
+      setBlinkValue(0); // 确保眼睛完全睁开
+    }
+  }
+}
+
+// 初始化鼠标追踪
+function initMouseTracking() {
+  // 监听鼠标移动
+  document.addEventListener('mousemove', onMouseMove);
+  
+  // 添加追踪控制按钮事件
+  document.getElementById('toggle-head-tracking').addEventListener('click', toggleHeadTracking);
+  document.getElementById('toggle-eye-tracking').addEventListener('click', toggleEyeTracking);
+  
+  // 添加追踪设置事件
+  document.getElementById('head-tracking-speed').oninput = e => headTrackingSpeed = parseFloat(e.target.value);
+  document.getElementById('eye-tracking-speed').oninput = e => eyeTrackingSpeed = parseFloat(e.target.value);
+  document.getElementById('head-limit-x').oninput = e => headRotationLimits.x = parseFloat(e.target.value);
+  document.getElementById('head-limit-y').oninput = e => headRotationLimits.y = parseFloat(e.target.value);
+  document.getElementById('eye-limit-x').oninput = e => eyeRotationLimits.x = parseFloat(e.target.value);
+  document.getElementById('eye-limit-y').oninput = e => eyeRotationLimits.y = parseFloat(e.target.value);
+}
+
+// 鼠标移动事件处理
+function onMouseMove(event) {
+  // 将鼠标位置转换为归一化坐标 (-1 到 1)
+  mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+// 更新头部和眼睛追踪
+function updateTracking(delta) {
+  if (!vrm || !vrm.humanoid) return;
+  
+  // 获取头部和眼睛骨骼
+  const headBone = vrm.humanoid.getNormalizedBoneNode('head');
+  const leftEyeBone = vrm.humanoid.getNormalizedBoneNode('leftEye');
+  const rightEyeBone = vrm.humanoid.getNormalizedBoneNode('rightEye');
+  
+  // 头部追踪
+  if (headTrackingEnabled && headBone) {
+    updateHeadTracking(headBone, delta);
+  }
+  
+  // 眼睛追踪
+  if (eyeTrackingEnabled) {
+    if (leftEyeBone) updateEyeTracking(leftEyeBone, delta);
+    if (rightEyeBone) updateEyeTracking(rightEyeBone, delta);
+    
+    // 如果没有独立的眼睛骨骼，尝试使用VRM 1.0的视线追踪
+    if (!leftEyeBone && !rightEyeBone && vrm.lookAt) {
+      updateLookAtTracking(delta);
+    }
+  }
+}
+
+// 更新头部追踪
+function updateHeadTracking(headBone, delta) {
+  // 计算目标旋转角度（基于鼠标位置）
+  const targetRotationX = mouseY * headRotationLimits.x;
+  const targetRotationY = mouseX * headRotationLimits.y;
+  
+  // 平滑插值到目标旋转
+  headBone.rotation.x += (targetRotationX - headBone.rotation.x) * headTrackingSpeed;
+  headBone.rotation.y += (targetRotationY - headBone.rotation.y) * headTrackingSpeed;
+  
+  // 限制旋转范围
+  headBone.rotation.x = Math.max(-headRotationLimits.x, Math.min(headRotationLimits.x, headBone.rotation.x));
+  headBone.rotation.y = Math.max(-headRotationLimits.y, Math.min(headRotationLimits.y, headBone.rotation.y));
+}
+
+// 更新眼睛骨骼追踪
+function updateEyeTracking(eyeBone, delta) {
+  // 计算目标旋转角度
+  const targetRotationX = mouseY * eyeRotationLimits.x;
+  const targetRotationY = mouseX * eyeRotationLimits.y;
+  
+  // 平滑插值到目标旋转
+  eyeBone.rotation.x += (targetRotationX - eyeBone.rotation.x) * eyeTrackingSpeed;
+  eyeBone.rotation.y += (targetRotationY - eyeBone.rotation.y) * eyeTrackingSpeed;
+  
+  // 限制旋转范围
+  eyeBone.rotation.x = Math.max(-eyeRotationLimits.x, Math.min(eyeRotationLimits.x, eyeBone.rotation.x));
+  eyeBone.rotation.y = Math.max(-eyeRotationLimits.y, Math.min(eyeRotationLimits.y, eyeBone.rotation.y));
+}
+
+// 更新VRM 1.0的视线追踪（如果模型支持）
+function updateLookAtTracking(delta) {
+  if (!vrm.lookAt) return;
+  
+  try {
+    // VRM 1.0使用lookAt功能来控制视线
+    const lookAtTarget = new THREE.Vector3(
+      mouseX * 2,  // X方向
+      mouseY * 2,  // Y方向  
+      -2           // Z方向（看向前方）
+    );
+    
+    // 应用视线目标
+    vrm.lookAt.target = lookAtTarget;
+    
+    // 设置视线权重（1.0表示完全跟随）
+    vrm.lookAt.weight = 1.0;
+  } catch (e) {
+    console.warn('视线追踪失败:', e);
+  }
+}
+
+// 切换头部追踪
+function toggleHeadTracking() {
+  headTrackingEnabled = !headTrackingEnabled;
+  const btn = document.getElementById('toggle-head-tracking');
+  btn.textContent = `头部追踪:${headTrackingEnabled ? '开' : '关'}`;
+  btn.className = headTrackingEnabled ? 'bg-purple-500' : 'bg-gray-500';
+}
+
+// 切换眼睛追踪
+function toggleEyeTracking() {
+  eyeTrackingEnabled = !eyeTrackingEnabled;
+  const btn = document.getElementById('toggle-eye-tracking');
+  btn.textContent = `眼睛追踪:${eyeTrackingEnabled ? '开' : '关'}`;
+  btn.className = eyeTrackingEnabled ? 'bg-indigo-500' : 'bg-gray-500';
+}
+
+// 情感表情映射
+function setEmotionExpression(emotion) {
+  if (!vrm || !vrm.expressionManager) return;
+  
+  emotionState = emotion;
+  
+  try {
+    // 重置所有表情
+    const expressions = vrm.expressionManager.expressions || [];
+    expressions.forEach(expr => {
+      vrm.expressionManager.setValue(expr.name, 0);
+    });
+    
+    // 根据情感设置表情
+    switch(emotion) {
+      case 'happy':
+        vrm.expressionManager.setValue('happy', 0.8);
+        break;
+      case 'sad':
+        vrm.expressionManager.setValue('sad', 0.8);
+        break;
+      case 'angry':
+        vrm.expressionManager.setValue('angry', 0.8);
+        break;
+      case 'surprised':
+        vrm.expressionManager.setValue('surprised', 0.8);
+        break;
+      default:
+        // neutral - 保持默认
+        break;
+    }
+  } catch (e) {
+    console.warn('设置表情失败:', e);
+  }
+}
+
+// 说话口型同步
+function updateSpeakingAnimation(delta) {
+  if (!isSpeaking || !vrm) return;
+  
+  const speakingTime = (Date.now() - speakingStartTime) / 1000;
+  
+  // 简单的口型动画（基于时间）
+  if (vrm.expressionManager) {
+    try {
+      const mouthOpen = Math.sin(speakingTime * 8) * 0.3 + 0.1;
+      vrm.expressionManager.setValue('mouthOpen', Math.max(0, mouthOpen));
+    } catch (e) {
+      console.warn('口型动画失败:', e);
+    }
+  }
+}
+
+// 手势动画
+function playGesture(gestureName) {
+  if (!vrm || !vrm.humanoid) return;
+  
+  gestureQueue.push(gestureName);
+  processGestureQueue();
+}
+
+function processGestureQueue() {
+  if (isPlayingGesture || gestureQueue.length === 0) return;
+  
+  isPlayingGesture = true;
+  const gesture = gestureQueue.shift();
+  
+  switch(gesture) {
+    case 'wave':
+      playWaveGesture();
+      break;
+    case 'nod':
+      playNodGesture();
+      break;
+    case 'shake':
+      playShakeGesture();
+      break;
+    case 'point':
+      playPointGesture();
+      break;
+  }
+  
+  // 手势完成后继续处理队列
+  setTimeout(() => {
+    isPlayingGesture = false;
+    if (gestureQueue.length > 0) {
+      processGestureQueue();
+    }
+  }, 2000);
+}
+
+function playWaveGesture() {
+  if (!bones.leftUpperArm) return;
+  
+  // 挥手动画
+  const originalRotation = bones.leftUpperArm.rotation.clone();
+  
+  // 抬起手臂
+  bones.leftUpperArm.rotation.x += 0.5;
+  bones.leftUpperArm.rotation.y += 0.3;
+  
+  // 挥手动作
+  let waveProgress = 0;
+  const waveAnimation = () => {
+    if (waveProgress < 1) {
+      const wave = Math.sin(waveProgress * Math.PI * 4) * 0.3;
+      bones.leftUpperArm.rotation.z = originalRotation.z + wave;
+      waveProgress += 0.05;
+      requestAnimationFrame(waveAnimation);
+    } else {
+      // 恢复原位置
+      bones.leftUpperArm.rotation.copy(originalRotation);
+    }
+  };
+  
+  waveAnimation();
+}
+
+function playNodGesture() {
+  if (!bones.head) return;
+  
+  const originalRotation = bones.head.rotation.clone();
+  
+  // 点头动画
+  let nodProgress = 0;
+  const nodAnimation = () => {
+    if (nodProgress < 1) {
+      const nod = Math.sin(nodProgress * Math.PI) * 0.2;
+      bones.head.rotation.x = originalRotation.x + nod;
+      nodProgress += 0.1;
+      requestAnimationFrame(nodAnimation);
+    } else {
+      bones.head.rotation.copy(originalRotation);
+    }
+  };
+  
+  nodAnimation();
+}
+
+function playShakeGesture() {
+  if (!bones.head) return;
+  
+  const originalRotation = bones.head.rotation.clone();
+  
+  // 摇头动画
+  let shakeProgress = 0;
+  const shakeAnimation = () => {
+    if (shakeProgress < 1) {
+      const shake = Math.sin(shakeProgress * Math.PI * 6) * 0.15;
+      bones.head.rotation.y = originalRotation.y + shake;
+      shakeProgress += 0.08;
+      requestAnimationFrame(shakeAnimation);
+    } else {
+      bones.head.rotation.copy(originalRotation);
+    }
+  };
+  
+  shakeAnimation();
+}
+
+function playPointGesture() {
+  if (!bones.rightUpperArm || !bones.rightLowerArm) return;
+  
+  const originalUpper = bones.rightUpperArm.rotation.clone();
+  const originalLower = bones.rightLowerArm.rotation.clone();
+  
+  // 指向动画
+  bones.rightUpperArm.rotation.x += 0.3;
+  bones.rightUpperArm.rotation.y += 0.2;
+  bones.rightLowerArm.rotation.x += 0.4;
+  
+  // 2秒后恢复
+  setTimeout(() => {
+    bones.rightUpperArm.rotation.copy(originalUpper);
+    bones.rightLowerArm.rotation.copy(originalLower);
+  }, 2000);
+}
+
+// 待机动画
+function updateIdleAnimation(delta) {
+  if (!vrm || isSpeaking || isPlayingGesture) return;
+  
+  const time = performance.now() * 0.001;
+  
+  // 轻微的头部摆动
+  if (bones.head) {
+    const headSway = Math.sin(time * 0.5) * 0.02;
+    bones.head.rotation.y = headSway;
+  }
+  
+  // 偶尔的眨眼
+  if (Math.random() < 0.001) { // 0.1% 概率
+    setBlinkValue(1);
+    setTimeout(() => setBlinkValue(0), 100);
+  }
+}
+
+// ========== 增强功能：高级情感分析 ==========
+function analyzeEmotion(text) {
+  const emotionKeywords = {
+    happy: {
+      words: ['开心', '高兴', '快乐', '哈哈', '笑', '好', '棒', '喜欢', '爱', '太好了', '完美', '赞', '优秀', '满意', '幸福', '甜', '温暖', '感动'],
+      weight: 1.0
+    },
+    sad: {
+      words: ['难过', '伤心', '哭', '不好', '讨厌', '恨', '失望', '悲伤', '痛苦', '遗憾', '可惜', '糟糕', '沮丧', '郁闷'],
+      weight: 1.2
+    },
+    angry: {
+      words: ['生气', '愤怒', '讨厌', '烦', '气', '恼火', '暴躁', '不爽', '火大', '受够了'],
+      weight: 1.1
+    },
+    surprised: {
+      words: ['惊讶', '意外', '哇', '天哪', '真的', '不会吧', '居然', '竟然', '没想到', '震惊'],
+      weight: 0.9
+    },
+    love: {
+      words: ['爱', '喜欢', '想你', '亲爱的', '宝贝', '心动', '迷恋', '爱慕', '倾心'],
+      weight: 1.3
+    },
+    confused: {
+      words: ['不懂', '迷惑', '疑惑', '困惑', '什么意思', '不明白', '怎么', '为什么'],
+      weight: 0.8
+    }
+  };
+  
+  const lowerText = text.toLowerCase();
+  let emotionScores = {};
+  
+  // 计算每种情感的得分
+  for (const [emotion, data] of Object.entries(emotionKeywords)) {
+    let score = 0;
+    for (const word of data.words) {
+      if (lowerText.includes(word)) {
+        score += data.weight;
+      }
+    }
+    emotionScores[emotion] = score;
+  }
+  
+  // 找出得分最高的情感
+  let maxScore = 0;
+  let dominantEmotion = 'neutral';
+  
+  for (const [emotion, score] of Object.entries(emotionScores)) {
+    if (score > maxScore) {
+      maxScore = score;
+      dominantEmotion = emotion;
+    }
+  }
+  
+  if (conversationAnalytics.emotionDistribution[dominantEmotion] !== undefined) {
+    conversationAnalytics.emotionDistribution[dominantEmotion]++;
+  }
+  
+  // 如果得分太低，返回中性
+  return maxScore > 0 ? dominantEmotion : 'neutral';
+}
+
+// ========== 增强功能：关键词提取和分析 ==========
+function extractKeywords(text) {
+  // 中文分词（简化版）
+  const stopWords = ['的', '了', '是', '在', '我', '你', '他', '她', '它', '们', '这', '那', '吗', '呢', '吧', '啊', '呀'];
+  const words = text.match(/[\u4e00-\u9fa5]+/g) || [];
+  
+  const keywords = words.filter(word => {
+    return word.length >= 2 && !stopWords.includes(word);
+  });
+  
+  // 更新关键词统计
+  keywords.forEach(keyword => {
+    conversationAnalytics.topKeywords[keyword] = (conversationAnalytics.topKeywords[keyword] || 0) + 1;
+  });
+  
+  return keywords;
+}
+
+// ========== 增强功能：对话分析报告 ==========
+function generateConversationReport() {
+  const sessionDuration = (Date.now() - conversationAnalytics.sessionStartTime) / 1000 / 60; // 分钟
+  const topKeywords = Object.entries(conversationAnalytics.topKeywords)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([word, count]) => `${word}(${count}次)`);
+  
+  const emotionStats = Object.entries(conversationAnalytics.emotionDistribution)
+    .map(([emotion, count]) => `${emotion}: ${count}次`)
+    .join(', ');
+  
+  const report = `
+📊 对话分析报告
+━━━━━━━━━━━━━━━━━━━━
+⏱️  会话时长: ${sessionDuration.toFixed(1)} 分钟
+💬 总消息数: ${conversationAnalytics.totalMessages}
+👤 用户消息: ${conversationAnalytics.userMessages}
+🤖 AI回复: ${conversationAnalytics.aiMessages}
+⚡ 平均响应: ${conversationAnalytics.averageResponseTime.toFixed(2)}秒
+
+😊 情感分布:
+${emotionStats}
+
+🔤 高频词汇:
+${topKeywords.join(', ')}
+
+📈 对话活跃度: ${(conversationAnalytics.totalMessages / Math.max(sessionDuration, 1)).toFixed(1)} 条/分钟
+  `.trim();
+  
+  return report;
+}
+
+// ========== 增强功能：角色配置切换 ==========
+function switchCharacterProfile(profileName) {
+  if (!characterProfiles[profileName]) {
+    console.warn('角色配置不存在:', profileName);
+    return;
+  }
+  
+  currentProfile = profileName;
+  const profile = characterProfiles[profileName];
+  
+  // 更新角色名称
+  document.querySelector('.flex-shrink-0 h2').textContent = profile.name;
+  
+  // 更新音色
+  selectedVoice = profile.voice;
+  document.getElementById('voice-select').value = profile.voice;
+  
+  // 清空对话历史（可选）
+  conversationHistory = [];
+  
+  // 添加系统提示
+  conversationHistory.push({
+    role: "system",
+    content: profile.systemPrompt
+  });
+  
+  addMsg("系统", `已切换到角色: ${profile.name} (${profile.personality})`);
+  
+  // 播放欢迎语
+  const welcomeMessages = [
+    `你好！我是${profile.name}，很高兴认识你~`,
+    `嗨~ 我是${profile.name}，有什么可以帮你的吗？`,
+    `${profile.name}在这里！准备好和我聊天了吗？`
+  ];
+  const welcomeMsg = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+  
+  addMsg("AI助手", welcomeMsg);
+  if (chatTtsEnabled) {
+    chatTTS(welcomeMsg);
+  }
+}
+
+// ========== 增强功能：音效系统 ==========
+function initAudioSystem() {
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // 创建简单的音效（使用Web Audio API）
+    soundEffects.messageSent = createBeepSound(800, 0.1, 0.05);
+    soundEffects.messageReceived = createBeepSound(600, 0.1, 0.05);
+    soundEffects.notification = createBeepSound(1000, 0.2, 0.1);
+    
+    console.log('音效系统初始化成功');
+  } catch (e) {
+    console.warn('音效系统初始化失败:', e);
+  }
+}
+
+function createBeepSound(frequency, duration, volume) {
+  return () => {
+    if (!audioContext) return;
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+  };
+}
+
+function playSound(soundName) {
+  if (soundEffects[soundName]) {
+    soundEffects[soundName]();
+  }
+}
+
+// ========== 增强功能：粒子系统 ==========
+function initParticleSystem() {
+  if (!scene) return;
+  
+  // 创建简单的粒子效果
+  const particleCount = 100;
+  const particles = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  const velocities = [];
+  
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    positions[i] = (Math.random() - 0.5) * 10;
+    positions[i + 1] = Math.random() * 5;
+    positions[i + 2] = (Math.random() - 0.5) * 10;
+    
+    velocities.push({
+      x: (Math.random() - 0.5) * 0.02,
+      y: Math.random() * 0.02,
+      z: (Math.random() - 0.5) * 0.02
+    });
+  }
+  
+  particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.05,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending
+  });
+  
+  particleSystem = new THREE.Points(particles, particleMaterial);
+  particleSystem.userData.velocities = velocities;
+  particleSystem.visible = false; // 默认隐藏
+  
+  scene.add(particleSystem);
+}
+
+function updateParticleSystem(delta) {
+  if (!particleSystem || !particleSystem.visible) return;
+  
+  const positions = particleSystem.geometry.attributes.position.array;
+  const velocities = particleSystem.userData.velocities;
+  
+  for (let i = 0; i < positions.length; i += 3) {
+    const vi = i / 3;
+    
+    positions[i] += velocities[vi].x;
+    positions[i + 1] += velocities[vi].y;
+    positions[i + 2] += velocities[vi].z;
+    
+    // 边界检测，重置粒子位置
+    if (positions[i + 1] > 5) {
+      positions[i + 1] = 0;
+      positions[i] = (Math.random() - 0.5) * 10;
+      positions[i + 2] = (Math.random() - 0.5) * 10;
+    }
+  }
+  
+  particleSystem.geometry.attributes.position.needsUpdate = true;
+}
+
+// ========== 增强功能：场景切换 ==========
+function switchScene(sceneName) {
+  currentScene = sceneName;
+  
+  switch(sceneName) {
+    case 'default':
+      if (directionalLight) directionalLight.color.setHex(0xffffff);
+      if (ambientLight) ambientLight.color.setHex(0xffffff);
+      if (particleSystem) particleSystem.visible = false;
+      break;
+      
+    case 'night':
+      if (directionalLight) {
+        directionalLight.color.setHex(0x6699ff);
+        directionalLight.intensity = 0.3;
+      }
+      if (ambientLight) {
+        ambientLight.color.setHex(0x334466);
+        ambientLight.intensity = 0.2;
+      }
+      if (particleSystem) particleSystem.visible = true;
+      break;
+      
+    case 'sunset':
+      if (directionalLight) {
+        directionalLight.color.setHex(0xff9966);
+        directionalLight.intensity = 0.6;
+      }
+      if (ambientLight) {
+        ambientLight.color.setHex(0xffbb99);
+        ambientLight.intensity = 0.3;
+      }
+      break;
+      
+    case 'warm':
+      if (directionalLight) {
+        directionalLight.color.setHex(0xffddaa);
+        directionalLight.intensity = 0.8;
+      }
+      if (ambientLight) {
+        ambientLight.color.setHex(0xffeedd);
+        ambientLight.intensity = 0.4;
+      }
+      break;
+  }
+  
+  addMsg("系统", `场景已切换: ${sceneName}`);
+}
+
+// ========== 增强功能：快捷键系统 ==========
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // 构建快捷键字符串
+    let shortcut = '';
+    if (e.ctrlKey) shortcut += 'ctrl+';
+    if (e.shiftKey) shortcut += 'shift+';
+    if (e.altKey) shortcut += 'alt+';
+    
+    // 特殊键
+    if (e.key === ' ') shortcut += 'space';
+    else if (e.key === 'Escape') shortcut += 'escape';
+    else shortcut += e.key.toLowerCase();
+    
+    // 执行快捷键对应的功能
+    if (keyboardShortcuts[shortcut]) {
+      e.preventDefault();
+      keyboardShortcuts[shortcut]();
+    }
+  });
+  
+  console.log('快捷键系统已初始化');
+  addMsg("系统", "💡 快捷键提示: Ctrl+M=语音, Ctrl+S=导出, Ctrl+L=清空, ESC=停止");
+}
+
+// ========== 增强功能：智能消息建议 ==========
+function suggestMessages() {
+  const suggestions = [
+    "你好呀！",
+    "今天过得怎么样？",
+    "能给我讲个故事吗？",
+    "你最喜欢什么？",
+    "我们聊点什么好呢？",
+    "能帮我一个忙吗？",
+    "你会做什么？",
+    "给我推荐点什么吧"
+  ];
+  
+  return suggestions;
+}
+
+function showMessageSuggestions() {
+  const suggestions = suggestMessages();
+  const randomSuggestions = suggestions.sort(() => 0.5 - Math.random()).slice(0, 3);
+  
+  // 在聊天框中显示建议
+  const suggestionsHTML = randomSuggestions.map(s => 
+    `<button class="suggestion-btn" onclick="sendMessage('${s}')">${s}</button>`
+  ).join('');
+  
+  addMsg("系统", `💡 你可以试试: ${suggestionsHTML}`);
+}
+
+function updateProcedural(delta){ 
+  if(!vrm) return; 
+  updateBreathing(delta);
+  updateBlinking(delta);
+  updateTracking(delta);
+  updateSpeakingAnimation(delta);
+  updateIdleAnimation(delta);
+  updateParticleSystem(delta); // 增强：粒子系统更新
+}
+
+function animate(){ 
+  requestAnimationFrame(animate); 
+  const delta = clock.getDelta(); 
+  
+  // 更新性能统计
+  updatePerformanceStats();
+  
+  if(vrm){ 
+    try{ 
+      vrm.update(delta); 
+    }catch(e){} 
+    updateProcedural(delta); 
+  } 
+  renderer.render(scene, camera); 
+}
+
+function showLoading(s,txt){ 
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.style.display = s ? 'flex' : 'none';
+  }
+  
+  if(txt) {
+    const loadingText = document.getElementById('loading-text');
+    if (loadingText) {
+      loadingText.innerText = txt;
+    }
+  }
+}
+
+// 发送消息函数
+function sendMessage(message) {
+  if (!message.trim()) return;
+  
+  // 显示用户消息
+  addMsg("用户", message);
+  
+  // 发送到AI
+  sendMessageToAI(message);
+}
+
+function initEvents(){
+  // 设置面板开关
+  document.getElementById('open-settings').addEventListener('click', ()=> {
+    document.getElementById('settings-panel').classList.remove('settings-hidden');
+  });
+  document.getElementById('close-settings').addEventListener('click', ()=> {
+    document.getElementById('settings-panel').classList.add('settings-hidden');
+  });
+  
+  // VRM文件上传
+  document.getElementById('vrm-file-input').addEventListener('change', e => { 
+    if(e.target.files.length>0) loadVRM(e.target.files[0]); 
+  });
+  
+  // 新的控制面板中的VRM文件上传
+  const vrmFileInput = document.getElementById('vrm-file');
+  if (vrmFileInput) {
+    vrmFileInput.addEventListener('change', e => { 
+      if(e.target.files.length>0) {
+        loadVRM(e.target.files[0]);
+        // 更新状态显示
+        updateServiceStatus('vrm', 'connected', 'VRM 模型已加载');
+      }
+    });
+  }
+  
+  // 模型控制事件监听器
+  initModelControls();
+  
+  const drop = document.getElementById('vrm-drop-zone');
+  drop.addEventListener('click', ()=> document.getElementById('vrm-file-input').click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drop-zone-active'); });
+  drop.addEventListener('dragleave', e => drop.classList.remove('drop-zone-active'));
+  drop.addEventListener('drop', e => { 
+    e.preventDefault(); 
+    drop.classList.remove('drop-zone-active'); 
+    if(e.dataTransfer.files.length>0) loadVRM(e.dataTransfer.files[0]); 
+  });
+
+  // 灯光设置
+  document.getElementById('dir-light-intensity').addEventListener('input', e => directionalLight.intensity = parseFloat(e.target.value));
+  document.getElementById('amb-light-intensity').addEventListener('input', e => ambientLight.intensity = parseFloat(e.target.value));
+  document.getElementById('breath-intensity').addEventListener('input', e => breathIntensity = parseFloat(e.target.value));
+  
+  // 眨眼动画设置
+  document.getElementById('blink-interval').addEventListener('input', e => blinkInterval = parseFloat(e.target.value));
+  document.getElementById('blink-speed').addEventListener('input', e => blinkSpeed = parseFloat(e.target.value));
+
+  // 动画控制按钮
+  document.getElementById('toggle-breathing').addEventListener('click', function(){ 
+    breathingEnabled = !breathingEnabled; 
+    this.textContent = `呼吸动画:${breathingEnabled ? '开' : '关'}`; 
+    this.className = breathingEnabled ? 'bg-blue-500' : 'bg-gray-500'; 
+  });
+  
+  document.getElementById('toggle-blinking').addEventListener('click', function(){ 
+    blinkingEnabled = !blinkingEnabled;
+    this.textContent = `眨眼动画:${blinkingEnabled ? '开' : '关'}`; 
+    this.className = blinkingEnabled ? 'bg-green-500' : 'bg-gray-500';
+    
+    // 重置眨眼状态
+    if (blinkingEnabled) {
+      blinkTimer = 0;
+      isBlinking = false;
+      setBlinkValue(0); // 确保眼睛睁开
+    }
+  });
+
+  // 聊天功能
+  document.getElementById('send-message').addEventListener('click', ()=>{ 
+    const input = document.getElementById('chat-input'); 
+    if(input.value.trim()){ 
+      sendMessage(input.value.trim());
+      input.value=''; 
+    } 
+  });
+  
+  // 回车发送消息
+  document.getElementById('chat-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      document.getElementById('send-message').click();
+    }
+  });
+
+  // 语音输入按钮
+  document.getElementById('voice-input-btn').addEventListener('click', toggleVoice);
+  document.getElementById('toggle-voice').addEventListener('click', toggleVoice);
+
+  // 清空对话按钮
+  document.getElementById('clear-chat').addEventListener('click', function() {
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.innerHTML = '';
+    conversationHistory = [];
+    localStorage.removeItem('ai-eva-conversation');
+    addMsg("AI助手", "对话已清空，开始新的对话吧！");
+  });
+  
+  // SenseVoice 切换按钮
+  document.getElementById('toggle-sensevoice').addEventListener('click', function() {
+    useSenseVoice = !useSenseVoice;
+    const btn = document.getElementById('toggle-sensevoice');
+    
+    if (useSenseVoice) {
+      btn.innerHTML = '<span class="material-icons-round">record_voice_over</span>语音识别:开';
+      btn.className = 'active';
+      addMsg("系统", "已切换到 SenseVoice 语音识别模式（更准确）");
+    } else {
+      btn.innerHTML = '<span class="material-icons-round">record_voice_over</span>语音识别:关';
+      btn.className = '';
+      addMsg("系统", "已切换到浏览器原生语音识别模式");
+    }
+  });
+  
+  // 导出功能按钮
+  document.getElementById('export-txt').addEventListener('click', () => exportConversation('txt'));
+  document.getElementById('export-json').addEventListener('click', () => exportConversation('json'));
+  
+  document.getElementById('share-btn').addEventListener('click', shareDemo);
+  
+  document.getElementById('skip-tutorial').addEventListener('click', () => {
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    localStorage.setItem('ai-eva-tutorial-skipped', 'true');
+  });
+  
+  document.getElementById('start-tutorial').addEventListener('click', () => {
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    startTutorial();
+  });
+  
+按钮
+  document.getElementById('clear-performance').addEventListener('click', function() {
+    performanceStats.apiResponseTime = {};
+    performanceStats.frameCount = 0;
+    performanceStats.lastFpsUpdate = Date.now();
+    addMsg("系统", "性能统计已清空");
+  });
+  
+  document.getElementById('toggle-performance').addEventListener('click', function() {
+    const panel = document.getElementById('performance-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Ollama设置更新
+  document.getElementById('ollama-url').addEventListener('change', function() {
+    ollamaUrl = this.value;
+    initOllamaConnection();
+  });
+  
+  document.getElementById('ollama-model').addEventListener('change', function() {
+    ollamaModel = this.value;
+    conversationHistory = []; // 清空历史记录
+    addMsg("系统", `已切换到模型: ${ollamaModel}`);
+  });
+  
+  // 测试连接按钮
+  const testConnectionBtn = document.getElementById('test-connection');
+  if (testConnectionBtn) {
+    testConnectionBtn.addEventListener('click', initOllamaConnection);
+  }
+
+  // 截图功能
+  const screenshotBtn = document.getElementById('screenshot-btn');
+  if (screenshotBtn) {
+    screenshotBtn.addEventListener('click', ()=>{
+    try{
+      const dataURL = renderer.domElement.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = dataURL; a.download = 'vrm_screenshot.png'; document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){ console.warn('截图失败', e); }
+  });
+  }
+
+  // 重置位置及恢复骨骼初始旋转
+  const resetPositionBtn = document.getElementById('reset-position-btn');
+  if (resetPositionBtn) {
+    resetPositionBtn.addEventListener('click', ()=>{
+    if(vrm && vrm.scene) vrm.scene.position.set(0,0,0);
+    
+    // 重置到初始状态而不是原始状态
+    for(const k in bones){ 
+      if(bones[k] && restPositions[k]) bones[k].position.copy(restPositions[k]); 
+      if(bones[k] && restRotations[k]) {
+        // 重置到初始状态（包含INITIAL_POSE的偏移）
+        bones[k].rotation.copy(restRotations[k]);
+      } 
+    }
+    
+    // 重置所有骨骼控制滑块
+    const sliders = document.querySelectorAll('#bone-controls input[type="range"]');
+    sliders.forEach(slider => {
+      slider.value = 0;
+    });
+    
+    // 重置按钮状态
+    const buttons = document.querySelectorAll('#bone-controls .button-group button');
+    buttons.forEach(button => {
+      button.classList.remove('active');
+      if (button.dataset.preset === 'natural') {
+        button.classList.add('active');
+      }
+    });
+    
+    // 重置眨眼状态
+    blinkingEnabled = true;
+    document.getElementById('toggle-blinking').textContent = '眨眼动画:开';
+    document.getElementById('toggle-blinking').className = 'bg-green-500';
+    blinkTimer = 0;
+    isBlinking = false;
+    setBlinkValue(0);
+    
+    // 重置追踪状态
+    headTrackingEnabled = true;
+    eyeTrackingEnabled = true;
+    document.getElementById('toggle-head-tracking').textContent = '头部追踪:开';
+    document.getElementById('toggle-head-tracking').className = 'bg-purple-500';
+    document.getElementById('toggle-eye-tracking').textContent = '眼睛追踪:开';
+    document.getElementById('toggle-eye-tracking').className = 'bg-indigo-500';
+    
+    // 重置鼠标位置
+    mouseX = 0;
+    mouseY = 0;
+  });
+  }
+
+  // 拖放全局支持（页面任意位置）
+  window.addEventListener('dragover', e => { e.preventDefault(); }, false);
+  window.addEventListener('drop', e => { 
+    e.preventDefault(); 
+    const f = e.dataTransfer.files && e.dataTransfer.files[0]; 
+    if(f && f.name.toLowerCase().endsWith('.vrm')) loadVRM(f); 
+    else console.warn('仅支持 .vrm 文件'); 
+  }, false);
+
+  // 窗口变更
+  window.addEventListener('resize', ()=>{ 
+    if(camera && renderer){ 
+      camera.aspect = window.innerWidth / window.innerHeight; 
+      camera.updateProjectionMatrix(); 
+      renderer.setSize(window.innerWidth, window.innerHeight); 
+    } 
+  });
+}
+
+function addMsg(sender, text, saveToHistory = true){ 
+  const box = document.getElementById('chat-messages'); 
+  const messageContainer = document.createElement('div'); 
+  
+  if(sender === '用户'){ 
+    messageContainer.className = 'message-container user-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.textContent = text;
+    messageContainer.appendChild(bubble);
+  } else if (sender === 'AI助手') {
+    messageContainer.className = 'message-container ai-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.textContent = text;
+    messageContainer.appendChild(bubble);
+  } else {
+    messageContainer.className = 'message-container system-message';
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+    bubble.innerHTML = text;
+    messageContainer.appendChild(bubble);
+  }
+  
+  box.appendChild(messageContainer); 
+  box.scrollTop = box.scrollHeight; 
+}
+
+// 实时状态更新函数
+function updateServiceStatus(service, status, message = '') {
+  const indicator = document.getElementById(`${service}-indicator`);
+  const text = document.getElementById(`${service}-text`);
+  
+  if (indicator && text) {
+    // 移除所有状态类
+    indicator.classList.remove('connected', 'connecting', 'disconnected');
+    
+    switch (status) {
+      case 'connected':
+        indicator.classList.add('connected');
+        text.textContent = message || `${service} 已连接`;
+        
+        // 如果是 Ollama 连接成功，显示模型选择器并获取模型列表
+        if (service === 'ollama') {
+          const modelSelector = document.getElementById('model-selector');
+          if (modelSelector) {
+            modelSelector.style.display = 'block';
+            modelSelector.style.animation = 'slideDown 0.4s ease-out';
+            // 动画结束后移除动画类
+            setTimeout(() => {
+              modelSelector.style.animation = '';
+            }, 400);
+          }
+          
+          // 获取模型列表
+          fetchOllamaModels();
+        }
+        break;
+      case 'connecting':
+        indicator.classList.add('connecting');
+        text.textContent = message || `${service} 连接中...`;
+        break;
+      case 'disconnected':
+        indicator.classList.add('disconnected');
+        text.textContent = message || `${service} 未连接`;
+        
+        // 如果是 Ollama 断开连接，隐藏模型选择器
+        if (service === 'ollama') {
+          const modelSelector = document.getElementById('model-selector');
+          if (modelSelector) {
+            modelSelector.style.animation = 'slideUp 0.3s ease-in';
+            setTimeout(() => {
+              modelSelector.style.display = 'none';
+              modelSelector.style.animation = '';
+            }, 300);
+          }
+        }
+        break;
+      case 'error':
+        indicator.classList.add('disconnected');
+        text.textContent = message || `${service} 连接错误`;
+        
+        // 如果是 Ollama 连接错误，隐藏模型选择器
+        if (service === 'ollama') {
+          const modelSelector = document.getElementById('model-selector');
+          if (modelSelector) {
+            modelSelector.style.animation = 'slideUp 0.3s ease-in';
+            setTimeout(() => {
+              modelSelector.style.display = 'none';
+              modelSelector.style.animation = '';
+            }, 300);
+          }
+        }
+        break;
+    }
+  }
+}
+
+// 获取Ollama模型列表
+async function fetchOllamaModels() {
+  try {
+    const response = await fetch(`${OLLAMA_API}/api/tags`, {
+      method: 'GET',
+      timeout: 5000
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const models = data.models || [];
+      
+      // 更新模型选择器
+      const modelSelect = document.getElementById('ollama-model');
+      if (modelSelect) {
+        // 清空现有选项
+        modelSelect.innerHTML = '';
+        
+        if (models.length > 0) {
+          // 添加模型选项
+          models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.name;
+            option.textContent = `${model.name} (${formatModelSize(model.size)})`;
+            modelSelect.appendChild(option);
+          });
+          
+          // 设置默认选择第一个模型
+          if (models.length > 0) {
+            modelSelect.value = models[0].name;
+          }
+        } else {
+          // 没有模型时显示提示
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = '未找到可用模型';
+          modelSelect.appendChild(option);
+        }
+      }
+      
+      return true;
+    } else {
+      throw new Error('Failed to fetch models');
+    }
+  } catch (error) {
+    console.error('获取Ollama模型失败:', error);
+    
+    // 更新模型选择器显示错误
+    const modelSelect = document.getElementById('ollama-model');
+    if (modelSelect) {
+      modelSelect.innerHTML = '<option value="">获取模型失败</option>';
+    }
+    
+    return false;
+  }
+}
+
+// 格式化模型大小
+function formatModelSize(bytes) {
+  if (!bytes) return '未知大小';
+  
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// 实时监控服务状态
+async function monitorServices() {
+  // 检查 Ollama 状态
+  try {
+    updateServiceStatus('ollama', 'connecting');
+    const response = await fetch(`${OLLAMA_API}/api/tags`, {
+      method: 'GET',
+      timeout: 3000
+    });
+    if (response.ok) {
+      updateServiceStatus('ollama', 'connected', 'Ollama 已连接');
+      // 连接成功时获取模型列表
+      await fetchOllamaModels();
+    } else {
+      updateServiceStatus('ollama', 'disconnected', 'Ollama 未响应');
+    }
+  } catch (error) {
+    updateServiceStatus('ollama', 'disconnected', 'Ollama 未连接');
+  }
+  
+  // 检查 ChatTTS 状态
+  try {
+    updateServiceStatus('tts', 'connecting');
+    const response = await fetch(`${CHAT_TTS_API}/health`, {
+      method: 'GET',
+      timeout: 3000
+    });
+    if (response.ok) {
+      updateServiceStatus('tts', 'connected', 'ChatTTS 已连接');
+    } else {
+      updateServiceStatus('tts', 'disconnected', 'ChatTTS 未响应');
+    }
+  } catch (error) {
+    updateServiceStatus('tts', 'disconnected', 'ChatTTS 未连接');
+  }
+  
+  // 检查 SenseVoice 状态
+  try {
+    const response = await fetch(`${SENSEVOICE_API}/health`, {
+      method: 'GET',
+      timeout: 3000
+    });
+    if (response.ok) {
+      updateServiceStatus('sensevoice', 'connected', 'SenseVoice 已连接');
+    } else {
+      updateServiceStatus('sensevoice', 'disconnected', 'SenseVoice 未响应');
+    }
+  } catch (error) {
+    updateServiceStatus('sensevoice', 'disconnected', 'SenseVoice 未连接');
+  }
+}
+
+// 启动实时监控
+function startServiceMonitoring() {
+  // 立即检查一次
+  monitorServices();
+  
+  // 每30秒检查一次
+  setInterval(monitorServices, 30000);
+  
+  // 当用户进行交互时也检查
+  document.addEventListener('click', () => {
+    setTimeout(monitorServices, 1000);
+  });
+}
+
+// 移动端控制面板切换
+function initMobileControlPanel() {
+  const toggleBtn = document.getElementById('toggle-control-panel');
+  const controlPanel = document.querySelector('.control-panel');
+  
+  if (toggleBtn && controlPanel) {
+    let isVisible = false;
+    
+    toggleBtn.addEventListener('click', () => {
+      if (isVisible) {
+        controlPanel.classList.add('hide');
+        setTimeout(() => {
+          controlPanel.classList.remove('show', 'hide');
+          controlPanel.classList.add('hidden');
+        }, 300);
+        isVisible = false;
+      } else {
+        controlPanel.classList.remove('hidden', 'hide');
+        controlPanel.classList.add('show');
+        isVisible = true;
+      }
+    });
+    
+    // 点击控制面板外部关闭
+    document.addEventListener('click', (e) => {
+      if (isVisible && !controlPanel.contains(e.target) && !toggleBtn.contains(e.target)) {
+        controlPanel.classList.add('hide');
+        setTimeout(() => {
+          controlPanel.classList.remove('show', 'hide');
+          controlPanel.classList.add('hidden');
+        }, 300);
+        isVisible = false;
+      }
+    });
+  }
+}
+
+// 初始化模型刷新功能
+function initModelRefresh() {
+  const refreshBtn = document.getElementById('refresh-models');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      // 显示加载状态
+      const modelSelect = document.getElementById('ollama-model');
+      if (modelSelect) {
+        modelSelect.innerHTML = '<option value="">正在刷新模型...</option>';
+      }
+      
+      // 添加旋转动画
+      refreshBtn.style.animation = 'spin 1s linear infinite';
+      
+      try {
+        await fetchOllamaModels();
+      } catch (error) {
+        console.error('刷新模型失败:', error);
+      } finally {
+        // 移除旋转动画
+        refreshBtn.style.animation = '';
+      }
+    });
+  }
+}
+
+// 初始化所有功能
+// 初始化模型控制
+function initModelControls() {
+  if (!vrm) return;
+  
+  // 位置控制
+  const positionControls = ['model-x', 'model-y', 'model-z'];
+  positionControls.forEach(id => {
+    const slider = document.getElementById(id);
+    const valueSpan = document.getElementById(id + '-value');
+    if (slider && valueSpan) {
+      slider.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        valueSpan.textContent = value.toFixed(1);
+        
+        if (vrm && vrm.scene) {
+          if (id === 'model-x') vrm.scene.position.x = value;
+          else if (id === 'model-y') vrm.scene.position.y = value;
+          else if (id === 'model-z') vrm.scene.position.z = value;
+        }
+      });
+    }
+  });
+  
+  // 旋转控制
+  const rotationControls = ['model-rotation-x', 'model-rotation-y', 'model-rotation-z'];
+  rotationControls.forEach(id => {
+    const slider = document.getElementById(id);
+    const valueSpan = document.getElementById(id + '-value');
+    if (slider && valueSpan) {
+      slider.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        valueSpan.textContent = value + '°';
+        
+        if (vrm && vrm.scene) {
+          const radians = value * Math.PI / 180;
+          if (id === 'model-rotation-x') vrm.scene.rotation.x = radians;
+          else if (id === 'model-rotation-y') vrm.scene.rotation.y = radians;
+          else if (id === 'model-rotation-z') vrm.scene.rotation.z = radians;
+        }
+      });
+    }
+  });
+  
+  // 缩放控制
+  const scaleSlider = document.getElementById('model-scale');
+  const scaleValue = document.getElementById('model-scale-value');
+  if (scaleSlider && scaleValue) {
+    scaleSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value);
+      scaleValue.textContent = value.toFixed(1);
+      
+      if (vrm && vrm.scene) {
+        vrm.scene.scale.setScalar(value);
+      }
+    });
+  }
+  
+  // 重置位置按钮
+  const resetBtn = document.getElementById('reset-model-position');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (vrm && vrm.scene) {
+        vrm.scene.position.set(0, 0, 0);
+        vrm.scene.rotation.set(0, 0, 0);
+        vrm.scene.scale.setScalar(1);
+        
+        // 重置滑块值
+        document.getElementById('model-x').value = 0;
+        document.getElementById('model-y').value = 0;
+        document.getElementById('model-z').value = 0;
+        document.getElementById('model-rotation-x').value = 0;
+        document.getElementById('model-rotation-y').value = 0;
+        document.getElementById('model-rotation-z').value = 0;
+        document.getElementById('model-scale').value = 1;
+        
+        // 更新显示值
+        document.getElementById('model-x-value').textContent = '0';
+        document.getElementById('model-y-value').textContent = '0';
+        document.getElementById('model-z-value').textContent = '0';
+        document.getElementById('model-rotation-x-value').textContent = '0°';
+        document.getElementById('model-rotation-y-value').textContent = '0°';
+        document.getElementById('model-rotation-z-value').textContent = '0°';
+        document.getElementById('model-scale-value').textContent = '1.0';
+      }
+    });
+  }
+  
+  // 居中显示按钮
+  const centerBtn = document.getElementById('center-model');
+  if (centerBtn) {
+    centerBtn.addEventListener('click', () => {
+      if (vrm && vrm.scene) {
+        vrm.scene.position.set(0, 0, 0);
+        vrm.scene.rotation.set(0, 0, 0); // 面向相机
+        
+        // 重置相机位置，确保模型居中
+        camera.position.set(0, 1.3, 2);
+        camera.lookAt(0, 1.2, 0);
+        controls.target.set(0, 1.2, 0);
+        controls.update();
+        
+        // 重置滑块值
+        document.getElementById('model-x').value = 0;
+        document.getElementById('model-y').value = 0;
+        document.getElementById('model-z').value = 0;
+        document.getElementById('model-rotation-x').value = 0;
+        document.getElementById('model-rotation-y').value = 0; // Y轴旋转0度
+        document.getElementById('model-rotation-z').value = 0;
+        
+        // 更新显示值
+        document.getElementById('model-x-value').textContent = '0';
+        document.getElementById('model-y-value').textContent = '0';
+        document.getElementById('model-z-value').textContent = '0';
+        document.getElementById('model-rotation-x-value').textContent = '0°';
+        document.getElementById('model-rotation-y-value').textContent = '0°';
+        document.getElementById('model-rotation-z-value').textContent = '0°';
+      }
+    });
+  }
+  
+  // 动作控制按钮
+  const actionButtons = [
+    { id: 'play-wave', action: 'wave' },
+    { id: 'play-nod', action: 'nod' },
+    { id: 'play-shake', action: 'shake' },
+    { id: 'play-point', action: 'point' }
+  ];
+  
+  actionButtons.forEach(({ id, action }) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (vrm) {
+          playGesture(action);
+        }
+      });
+    }
+  });
+  
+  // 表情控制
+  const expressionControls = ['expression-happy', 'expression-angry', 'expression-sad', 'expression-surprised'];
+  expressionControls.forEach(id => {
+    const slider = document.getElementById(id);
+    const valueSpan = document.getElementById(id + '-value');
+    if (slider && valueSpan) {
+      slider.addEventListener('input', (e) => {
+        const value = parseFloat(e.target.value);
+        valueSpan.textContent = value.toFixed(1);
+        
+        if (vrm && vrm.expressionManager) {
+          const expressionName = id.replace('expression-', '');
+          vrm.expressionManager.setValue(expressionName, value);
+        }
+      });
+    }
+  });
+}
+
+async function initAll() {
+  initScene(); 
+  initEvents();
+  
+  // 初始化API设置
+  initApiSettings();
+  
+  initChatTTSControls();
+  
+  // 加载对话历史
+  loadConversationHistory();
+  
+  // 检查教程
+  checkTutorial();
+  
+  // ========== 增强功能初始化 ==========
+  // 初始化音效系统
+  initAudioSystem();
+  
+  // 初始化粒子系统
+  initParticleSystem();
+  
+  // 初始化快捷键
+  initKeyboardShortcuts();
+  
+  // 启动实时状态监控
+  startServiceMonitoring();
+  
+  // 初始化移动端控制面板
+  initMobileControlPanel();
+  
+  // 初始化模型刷新功能
+  initModelRefresh();
+  
+  // 显示消息建议（首次）
+  setTimeout(() => {
+    showMessageSuggestions();
+  }, 3000);
+  
+  // 测试所有连接
+  await testAllConnections();
+  
+  await initOllamaConnection();
+  
+  // 显示连接状态
+  const ollamaConnected = await testOllamaConnection();
+  const chatTtsConnected = await testChatTTSConnection();
+  
+  if (ollamaConnected && chatTtsConnected) {
+    addMsg("系统", "🎉 系统初始化完成！AI对话和语音功能已就绪");
+    addMsg("系统", "💡 试试说: \"你好\" 或使用快捷键 Ctrl+M 开启语音");
+  } else if (ollamaConnected) {
+    addMsg("系统", "⚠️ 系统初始化完成！AI对话已就绪，语音功能未连接");
+  } else if (chatTtsConnected) {
+    addMsg("系统", "⚠️ 系统初始化完成！语音功能已就绪，AI对话未连接");
+  } else {
+    addMsg("系统", "❌ 系统初始化完成！请检查AI和语音服务器连接");
+  }
+  
+  // 显示增强功能提示
+  setTimeout(() => {
+    addMsg("系统", "✨ 新功能: 多角色切换、场景氛围、对话分析等功能已启用！");
+  }, 5000);
+}
+
+// 启动
+initAll();
+</script>
+</body>
+</html>
