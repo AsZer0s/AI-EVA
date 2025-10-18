@@ -1,15 +1,22 @@
-from fastapi import FastAPI, Body, HTTPException
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import io, torch, torchaudio, ChatTTS
-import numpy as np
 import asyncio
+import hashlib
+import io
+import random
+import re
+import threading
 import time
-from typing import Optional
+
+import ChatTTS
+import torch
+import torchaudio
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
 from config import config
-from utils.logger import get_logger
 from utils.audio_cache import audio_cache
+from utils.logger import get_logger
 
 # 初始化日志
 logger = get_logger("chattts")
@@ -27,6 +34,13 @@ app.add_middleware(
 # 全局 ChatTTS 实例
 chat = None
 model_loaded = False
+_model_load_lock = asyncio.Lock()
+CONCURRENCY_LIMIT = max(1, config.MAX_CONCURRENT_REQUESTS)
+_generation_semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+_speaker_cache = {}
+_speaker_cache_lock = threading.RLock()
+_random_lock = threading.Lock()
+
 
 async def load_chattts_model():
     """异步加载 ChatTTS 模型"""
@@ -34,23 +48,27 @@ async def load_chattts_model():
     
     if model_loaded:
         return
-    
-    try:
-        logger.info("正在加载 ChatTTS 模型...")
-        chat = ChatTTS.Chat()
-        chat.load(compile=False)
-        model_loaded = True
-        
-        # 初始化女孩音色
-        init_girl_voice()
-        
-        logger.info("✅ ChatTTS 模型加载完成")
-    except Exception as e:
-        logger.error(f"❌ ChatTTS 模型加载失败: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"模型加载失败: {str(e)}"
-        )
+
+    async with _model_load_lock:
+        if model_loaded:
+            return
+
+        try:
+            logger.info("正在加载 ChatTTS 模型...")
+            chat = ChatTTS.Chat()
+            chat.load(compile=False)
+            model_loaded = True
+
+            # 初始化女孩音色
+            init_girl_voice()
+
+            logger.info("✅ ChatTTS 模型加载完成")
+        except Exception as e:
+            logger.error(f"❌ ChatTTS 模型加载失败: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"模型加载失败: {str(e)}"
+            )
 
 class TTSRequest(BaseModel):
     text: str
@@ -68,76 +86,114 @@ def init_girl_voice():
     global girl_spk_emb
     if chat is not None:
         girl_spk_emb = chat.sample_random_speaker()
+        with _speaker_cache_lock:
+            _speaker_cache["1031.pt"] = girl_spk_emb
     else:
         girl_spk_emb = None
+        with _speaker_cache_lock:
+            _speaker_cache.pop("1031.pt", None)
+
+
+def sanitize_text(raw_text: str) -> str:
+    """标准化文本，提升缓存命中率并避免异常字符"""
+    cleaned = re.sub(r"[^\w\s\u4e00-\u9fff.,!?;:，。！？；：]", "", raw_text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _clone_embedding(embedding):
+    return embedding.clone() if hasattr(embedding, "clone") else embedding
+
+
+def _select_speaker_embedding(voice: str):
+    """根据音色选择或生成说话人嵌入"""
+    if voice == "1031.pt" and girl_spk_emb is not None:
+        return _clone_embedding(girl_spk_emb)
+
+    with _speaker_cache_lock:
+        cached_embedding = _speaker_cache.get(voice)
+    if cached_embedding is not None:
+        return _clone_embedding(cached_embedding)
+
+    if chat is None:
+        raise RuntimeError("ChatTTS 模型尚未加载")
+
+    voice_seed = hashlib.md5(voice.encode("utf-8")).hexdigest()
+    seed = int(voice_seed[:8], 16) % 1_000_000
+
+    with _random_lock:
+        state = random.getstate()
+        try:
+            random.seed(seed)
+            embedding = chat.sample_random_speaker()
+        finally:
+            random.setstate(state)
+
+    with _speaker_cache_lock:
+        _speaker_cache[voice] = embedding
+
+    return _clone_embedding(embedding)
+
+
+def _generate_audio_bytes(text: str, voice: str) -> bytes:
+    if chat is None:
+        raise RuntimeError("ChatTTS 模型尚未加载")
+
+    spk_emb = _select_speaker_embedding(voice)
+    params = ChatTTS.Chat.InferCodeParams(
+        spk_emb=spk_emb,
+        temperature=GIRL_VOICE_CONFIG["temperature"]
+    )
+
+    wavs = chat.infer([text], params_infer_code=params)
+    wav = torch.from_numpy(wavs[0]).unsqueeze(0)
+
+    buf = io.BytesIO()
+    torchaudio.save(buf, wav, 24000, format="mp3")
+    return buf.getvalue()
+
 
 @app.post("/tts")
 async def tts(request: TTSRequest):
     """文本转语音 API（支持缓存）"""
     try:
-        # 确保模型已加载
         await load_chattts_model()
-        
-        import re
-        text = request.text
-        text = re.sub(r'[^\w\s\u4e00-\u9fff.,!?;:，。！？；：]', '', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        
+
+        text = sanitize_text(request.text)
         if not text:
             raise HTTPException(status_code=400, detail="文本内容为空")
-        
-        # 检查缓存
-        cached_audio = audio_cache.get(text, request.voice)
-        if cached_audio:
-            logger.debug(f"使用缓存音频: {text[:20]}...")
+
+        async with _generation_semaphore:
+            cached_audio = audio_cache.get(text, request.voice)
+            if cached_audio:
+                logger.debug(f"使用缓存音频: {text[:20]}...")
+                return StreamingResponse(
+                    io.BytesIO(cached_audio),
+                    media_type="audio/mpeg"
+                )
+
+            logger.info(f"生成 TTS 音频: {text[:20]}...")
+            start_time = time.time()
+
+            audio_data = await asyncio.to_thread(_generate_audio_bytes, text, request.voice)
+            audio_cache.set(text, request.voice, 1.0, audio_data)
+
+            generation_time = time.time() - start_time
+            logger.info(f"TTS 生成完成，耗时: {generation_time:.2f}s")
+
             return StreamingResponse(
-                io.BytesIO(cached_audio), 
+                io.BytesIO(audio_data),
                 media_type="audio/mpeg"
             )
-        
-        # 生成音频
-        logger.info(f"生成 TTS 音频: {text[:20]}...")
-        start_time = time.time()
-        
-        # 根据选择的音色生成speaker embedding
-        import hashlib
-        voice_seed = hashlib.md5(request.voice.encode()).hexdigest()
-        seed = int(voice_seed[:8], 16) % 1000000
-        
-        import random
-        random.seed(seed)
-        spk_emb = chat.sample_random_speaker()
-        
-        params = ChatTTS.Chat.InferCodeParams(
-            spk_emb=spk_emb,
-            temperature=GIRL_VOICE_CONFIG["temperature"]
-        )
-        
-        wavs = chat.infer([text], params_infer_code=params)
-        wav = torch.from_numpy(wavs[0]).unsqueeze(0)
-        
-        # 保存为 MP3
-        buf = io.BytesIO()
-        torchaudio.save(buf, wav, 24000, format="mp3")
-        audio_data = buf.getvalue()
-        
-        # 缓存音频
-        audio_cache.set(text, request.voice, 1.0, audio_data)
-        
-        generation_time = time.time() - start_time
-        logger.info(f"TTS 生成完成，耗时: {generation_time:.2f}s")
-        
-        return StreamingResponse(
-            io.BytesIO(audio_data), 
-            media_type="audio/mpeg"
-        )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"TTS 生成失败: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"语音生成失败: {str(e)}"
-        )
+        ) from e
 
 @app.get("/")
 def root():
@@ -146,7 +202,8 @@ def root():
         "service": "ChatTTS API",
         "version": "1.0.0",
         "status": "running",
-        "model_loaded": model_loaded
+        "model_loaded": model_loaded,
+        "concurrency_limit": CONCURRENCY_LIMIT
     }
 
 @app.get("/health")
@@ -155,6 +212,7 @@ async def health_check():
     return {
         "status": "healthy",
         "model_loaded": model_loaded,
+        "concurrency_limit": CONCURRENCY_LIMIT,
         "cache_stats": audio_cache.get_stats()
     }
 
@@ -178,8 +236,16 @@ async def batch_tts(requests: list[TTSRequest]):
         results = []
         for i, request in enumerate(requests):
             try:
-                # 检查缓存
-                cached_audio = audio_cache.get(request.text, request.voice)
+                text = sanitize_text(request.text)
+                if not text:
+                    results.append({
+                        "index": i,
+                        "success": False,
+                        "error": "文本内容为空"
+                    })
+                    continue
+
+                cached_audio = audio_cache.get(text, request.voice)
                 if cached_audio:
                     results.append({
                         "index": i,
