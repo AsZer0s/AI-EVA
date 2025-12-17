@@ -28,16 +28,23 @@ if not exist "requirements.txt" (
     exit /b 1
 )
 
-:: 安装依赖（如果需要）
-echo 📥 安装/更新依赖包...
-pip install -r requirements.txt --quiet
+:: 检查依赖是否已安装
+echo 📦 检查依赖包...
+pip show fastapi >nul 2>&1
 if errorlevel 1 (
-    echo ❌ 依赖安装失败，请检查网络连接
-    pause
-    exit /b 1
+    echo 📥 检测到缺少依赖，开始安装...
+    pip install -r requirements.txt --quiet
+    if errorlevel 1 (
+        echo ❌ 依赖安装失败，请检查网络连接
+        echo 💡 提示：可以使用国内镜像加速
+        echo    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+        pause
+        exit /b 1
+    )
+    echo ✅ 依赖安装完成
+) else (
+    echo ✅ 依赖已安装，跳过安装步骤
 )
-
-echo ✅ 依赖安装完成
 
 :: 检查端口占用
 echo.
@@ -76,38 +83,51 @@ if not exist "logs" mkdir logs
 
 :: 启动 ChatTTS 服务
 echo [1/4] 启动 ChatTTS 服务 (端口 9966)...
-start "ChatTTS" cmd /k "uvicorn chattts_api:app --host 0.0.0.0 --port 9966"
+start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& uvicorn chattts_api:app --host 0.0.0.0 --port 9966"
 
 :: 等待 ChatTTS 启动
-timeout /t 3 /nobreak >nul
+echo    等待服务启动中...
+timeout /t 5 /nobreak >nul
+
+:: 检查 ChatTTS 是否启动成功
+curl -s http://localhost:9966/ >nul 2>&1
+if errorlevel 1 (
+    echo    ⚠️  ChatTTS 服务可能启动失败，请检查 ChatTTS 窗口
+) else (
+    echo    ✅ ChatTTS 服务启动成功
+)
 
 :: 启动 SenseVoice 服务
 echo [2/4] 启动 SenseVoice 服务 (端口 50000)...
 if exist "SenseVoice\api.py" (
-    start "SenseVoice" cmd /k "cd SenseVoice && python api.py"
+    start "SenseVoice" cmd /k "title SenseVoice服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0SenseVoice ^&^& python api.py"
+    echo    等待服务启动中...
+    timeout /t 5 /nobreak >nul
 ) else (
-    echo ⚠️  SenseVoice 服务未找到，跳过启动
+    echo    ⚠️  SenseVoice 服务未找到，跳过启动
+    echo    💡 提示：SenseVoice 为可选服务，不影响基本功能
 )
-
-:: 等待 SenseVoice 启动
-timeout /t 3 /nobreak >nul
 
 :: 启动前端服务
 echo [3/4] 启动前端服务 (端口 8000)...
-start "Frontend" cmd /k "python -m http.server 8000"
+start "Frontend" cmd /k "title 前端服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& python -m http.server 8000"
 
 :: 等待前端启动
-timeout /t 2 /nobreak >nul
+echo    等待服务启动中...
+timeout /t 3 /nobreak >nul
 
 :: 启动 Ollama 服务（如果可用）
 echo [4/4] 检查 Ollama 服务...
 ollama --version >nul 2>&1
 if not errorlevel 1 (
-    echo ✅ 启动 Ollama 服务 (端口 11434)...
-    start "Ollama" cmd /k "ollama serve"
+    echo    ✅ 检测到 Ollama，启动服务 (端口 11434)...
+    start "Ollama" cmd /k "title Ollama服务 ^& chcp 65001 ^>nul ^& ollama serve"
+    timeout /t 3 /nobreak >nul
 ) else (
-    echo ⚠️  Ollama 未安装，请手动安装并启动
-    echo    下载地址：https://ollama.ai/download
+    echo    ⚠️  Ollama 未安装
+    echo    💡 提示：Ollama 是必需服务，请先安装
+    echo       下载地址：https://ollama.ai/download
+    echo       安装后需要先运行: ollama pull gemma2:2b
 )
 
 echo.
@@ -122,12 +142,21 @@ echo    • SenseVoice：http://localhost:50000
 echo    • Ollama：   http://localhost:11434
 echo.
 echo 💡 使用提示：
-echo    1. 等待 10-15 秒让所有服务完全启动
-echo    2. 在浏览器中打开 http://localhost:8000
-echo    3. 上传 VRM 模型文件开始体验
-echo    4. 在设置面板中配置 AI 模型和音色
+echo    1. 所有服务已启动，请等待 5-10 秒让服务完全就绪
+echo    2. 浏览器将自动打开，如果没有请手动访问 http://localhost:8000
+echo    3. 首次使用需要上传 VRM 模型文件（拖拽到浏览器窗口）
+echo    4. 在设置面板中配置 AI 模型（需要先运行: ollama pull gemma2:2b）
+echo    5. 选择音色并开始对话
 echo.
-echo 🔧 如需停止服务，请关闭对应的命令行窗口
+echo 🔧 服务管理：
+echo    • 如需停止服务，请关闭对应的命令行窗口
+echo    • 所有服务窗口标题已标注，方便识别
+echo    • 查看日志请查看各服务窗口的输出
+echo.
+echo 📝 新功能：
+echo    • ✅ 改进的陪伴性对话系统
+echo    • ✅ 基于音频分析的VRM口型同步
+echo    • ✅ 一键启动所有服务
 echo.
 
 :: 自动打开浏览器

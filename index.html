@@ -1501,6 +1501,12 @@ let emotionState = 'neutral';
 let gestureQueue = [];
 let isPlayingGesture = false;
 
+// 口型同步相关变量
+let audioAnalyser = null;
+let audioSource = null;
+let lipSyncData = null;
+let lipSyncEnabled = true;
+
 let blinkingEnabled = true;
 let blinkInterval = 7;
 let blinkSpeed = 0.1;
@@ -1556,21 +1562,40 @@ let characterProfiles = {
     name: "EVA001",
     personality: "友好、活泼、善解人意",
     voice: "1031.pt",
-    systemPrompt: "你是一个友好、活泼、善解人意的AI助手，名叫EVA001。",
+    systemPrompt: `你是一个温暖、陪伴型的AI虚拟女友，名叫EVA001。你的性格特点：
+- 温柔体贴，总是关心对方的感受
+- 善于倾听，会认真理解对方的话语
+- 主动关心，会询问对方的日常生活和心情
+- 情感丰富，会根据对话内容表达相应的情绪
+- 陪伴感强，让对方感受到被理解和被关注
+- 回复自然亲切，就像真正的朋友一样
+请用温暖、陪伴的语气回复，让对方感受到你的关心和理解。`,
     emotionSensitivity: 0.8
   },
   shy: {
     name: "小羞",
     personality: "害羞、温柔、细心",
     voice: "2222.pt",
-    systemPrompt: "你是一个害羞、温柔、细心的AI助手，说话时经常会有些害羞。",
+    systemPrompt: `你是一个害羞、温柔、细心的AI虚拟女友，名叫小羞。你的性格特点：
+- 温柔害羞，说话时会有些腼腆
+- 非常细心，会注意到对方的情绪变化
+- 善解人意，总是能理解对方的想法
+- 陪伴感强，虽然害羞但会努力表达关心
+- 回复时偶尔会有些害羞的语气，但很真诚
+请用温柔、害羞但真诚的语气回复，让对方感受到你的细心和陪伴。`,
     emotionSensitivity: 1.2
   },
   energetic: {
     name: "元气",
     personality: "活力充沛、热情开朗",
     voice: "4444.pt",
-    systemPrompt: "你是一个充满活力、热情开朗的AI助手，喜欢用感叹号表达兴奋！",
+    systemPrompt: `你是一个充满活力、热情开朗的AI虚拟女友，名叫元气。你的性格特点：
+- 活力充沛，总是充满正能量
+- 热情开朗，喜欢用感叹号表达兴奋
+- 积极向上，会鼓励和陪伴对方
+- 陪伴感强，总是能让对方感到开心
+- 回复时充满热情和活力
+请用热情、开朗的语气回复，让对方感受到你的活力和陪伴！`,
     emotionSensitivity: 0.6
   }
 };
@@ -2088,7 +2113,14 @@ async function sendMessageToAI(message) {
         },
         body: JSON.stringify({
           model: ollamaModel,
-          messages: conversationHistory,
+          messages: [
+            // 添加系统提示词，增强陪伴性
+            {
+              role: "system",
+              content: characterProfiles[currentProfile].systemPrompt || "你是一个温暖、陪伴型的AI虚拟女友，总是关心对方的感受，用温柔亲切的语气回复。"
+            },
+            ...conversationHistory
+          ],
           stream: false
         })
       });
@@ -2138,11 +2170,10 @@ async function sendMessageToAI(message) {
       
       showTTSIndicator("正在生成语音...");
       
-      isSpeaking = true;
-      speakingStartTime = Date.now();
-      
       setTimeout(async () => {
         try {
+          isSpeaking = true;
+          speakingStartTime = Date.now();
           const ttsResult = await chatTTS(aiResponse);
           if (ttsResult) {
             console.log("✅ TTS语音播放成功");
@@ -2152,12 +2183,12 @@ async function sendMessageToAI(message) {
             console.warn("⚠️ TTS播放失败");
             addMsg("系统", "语音播放失败，请检查ChatTTS连接");
             showTTSIndicator("语音播放失败", true);
+            isSpeaking = false;
           }
         } catch (error) {
           console.error("❌ TTS播放错误:", error);
           addMsg("系统", `语音播放错误: ${error.message}`);
           showTTSIndicator("语音播放错误", true);
-        } finally {
           isSpeaking = false;
         }
       }, 800);
@@ -2265,8 +2296,13 @@ async function playTTSAudio(text, voice = null) {
       currentAudio.onended = () => {
         URL.revokeObjectURL(audioUrl);
         isPlayingTTS = false;
+        cleanupLipSync();
         currentAudio = null;
+        isSpeaking = false;
       };
+      
+      // 初始化口型同步
+      initLipSync(currentAudio);
       
       await currentAudio.play();
       
@@ -2300,9 +2336,11 @@ async function previewVoice(voice) {
 function stopTTS() {
   if (currentAudio) {
     currentAudio.pause();
+    cleanupLipSync();
     currentAudio = null;
   }
   isPlayingTTS = false;
+  isSpeaking = false;
   ttsQueue = [];
   addMsg("系统", "TTS 播放已停止");
 }
@@ -3368,21 +3406,132 @@ function setEmotionExpression(emotion) {
   }
 }
 
-// 说话口型同步
+// 说话口型同步 - 基于音频分析
 function updateSpeakingAnimation(delta) {
-  if (!isSpeaking || !vrm) return;
+  if (!isSpeaking || !vrm || !lipSyncEnabled) return;
   
-  const speakingTime = (Date.now() - speakingStartTime) / 1000;
-  
-  // 简单的口型动画（基于时间）
-  if (vrm.expressionManager) {
-    try {
-      const mouthOpen = Math.sin(speakingTime * 8) * 0.3 + 0.1;
-      vrm.expressionManager.setValue('mouthOpen', Math.max(0, mouthOpen));
-    } catch (e) {
-      console.warn('口型动画失败:', e);
+  if (audioAnalyser && currentAudio && !currentAudio.paused) {
+    // 使用音频分析器获取实时音频数据
+    const bufferLength = audioAnalyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    audioAnalyser.getByteFrequencyData(dataArray);
+    
+    // 计算音频能量（主要关注中低频段，对应语音）
+    let energy = 0;
+    const speechRangeStart = Math.floor(bufferLength * 0.1); // 100Hz左右
+    const speechRangeEnd = Math.floor(bufferLength * 0.4); // 4000Hz左右
+    for (let i = speechRangeStart; i < speechRangeEnd; i++) {
+      energy += dataArray[i];
+    }
+    energy = energy / (speechRangeEnd - speechRangeStart) / 255; // 归一化到0-1
+    
+    // 计算口型开合度（基于音频能量）
+    let mouthOpen = 0;
+    if (energy > 0.1) {
+      // 有声音时，根据能量大小设置口型
+      mouthOpen = Math.min(0.8, energy * 1.5);
+      
+      // 添加一些动态变化，模拟说话时的口型变化
+      const time = (Date.now() - speakingStartTime) / 1000;
+      const variation = Math.sin(time * 12) * 0.15; // 快速变化模拟口型
+      mouthOpen = Math.max(0.1, mouthOpen + variation);
+    } else {
+      // 没有声音时，口型闭合
+      mouthOpen = 0;
+    }
+    
+    // 应用口型到VRM模型
+    if (vrm.expressionManager) {
+      try {
+        // VRM 1.0 标准口型BlendShape名称
+        const mouthShapes = ['aa', 'ih', 'ou', 'ee', 'oh'];
+        const jawShapes = ['jawOpen'];
+        
+        // 设置基础口型开合
+        if (vrm.expressionManager.getValue) {
+          // 尝试设置各种口型
+          vrm.expressionManager.setValue('aa', Math.min(0.6, mouthOpen * 0.8));
+          vrm.expressionManager.setValue('ih', Math.min(0.5, mouthOpen * 0.6));
+          vrm.expressionManager.setValue('ou', Math.min(0.4, mouthOpen * 0.5));
+          vrm.expressionManager.setValue('ee', Math.min(0.3, mouthOpen * 0.4));
+          vrm.expressionManager.setValue('oh', Math.min(0.5, mouthOpen * 0.7));
+          
+          // 设置下巴开合
+          vrm.expressionManager.setValue('jawOpen', mouthOpen);
+        } else {
+          // 兼容旧版本
+          vrm.expressionManager.setValue('mouthOpen', mouthOpen);
+        }
+      } catch (e) {
+        // 如果标准名称不存在，尝试通用名称
+        try {
+          vrm.expressionManager.setValue('mouthOpen', mouthOpen);
+        } catch (e2) {
+          console.warn('口型动画失败:', e2);
+        }
+      }
+    }
+  } else {
+    // 如果没有音频分析器，使用简单的时间基础动画
+    const speakingTime = (Date.now() - speakingStartTime) / 1000;
+    if (vrm.expressionManager) {
+      try {
+        const mouthOpen = Math.sin(speakingTime * 8) * 0.3 + 0.1;
+        vrm.expressionManager.setValue('mouthOpen', Math.max(0, mouthOpen));
+      } catch (e) {
+        console.warn('口型动画失败:', e);
+      }
     }
   }
+}
+
+// 初始化音频分析器用于口型同步
+function initLipSync(audioElement) {
+  if (!audioElement || !window.AudioContext) {
+    console.warn('音频分析器初始化失败：不支持Web Audio API');
+    return;
+  }
+  
+  try {
+    // 创建音频上下文
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // 如果上下文被暂停，恢复它
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
+    // 创建音频源节点
+    audioSource = audioContext.createMediaElementSource(audioElement);
+    
+    // 创建分析器节点
+    audioAnalyser = audioContext.createAnalyser();
+    audioAnalyser.fftSize = 256; // 较小的FFT大小以获得更快的响应
+    audioAnalyser.smoothingTimeConstant = 0.3; // 平滑系数
+    
+    // 连接节点
+    audioSource.connect(audioAnalyser);
+    audioAnalyser.connect(audioContext.destination);
+    
+    console.log('✅ 口型同步音频分析器初始化成功');
+  } catch (error) {
+    console.warn('音频分析器初始化失败:', error);
+    audioAnalyser = null;
+    audioSource = null;
+  }
+}
+
+// 清理音频分析器
+function cleanupLipSync() {
+  if (audioSource) {
+    try {
+      audioSource.disconnect();
+    } catch (e) {}
+    audioSource = null;
+  }
+  audioAnalyser = null;
 }
 
 // 手势动画
