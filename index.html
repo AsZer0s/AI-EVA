@@ -1002,15 +1002,12 @@
       
       <div class="control-section">
         <h3>
-          <span class="material-icons-round">upload_file</span>
+          <span class="material-icons-round">face</span>
           模型管理
         </h3>
-        <div class="file-input-container">
-          <input type="file" id="vrm-file" accept=".vrm" />
-        </div>
         <div class="status" id="vrm-status">
           <span class="status-indicator" id="vrm-indicator">●</span>
-          <span id="vrm-text">未加载 VRM 模型</span>
+          <span id="vrm-text">正在加载 VRM 模型...</span>
         </div>
         
         <!-- 模型调整参数 -->
@@ -1174,7 +1171,7 @@
       <h3 class="text-2xl font-bold mb-4">🎭 欢迎使用 AI-EVA Demo</h3>
       <div class="space-y-3 text-sm">
         <p>✨ <strong>快速开始：</strong></p>
-        <p>1. 上传 VRM 模型文件（拖拽到界面）</p>
+        <p>1. VRM 模型已自动加载</p>
         <p>2. 配置 AI 模型和音色设置</p>
         <p>3. 开始对话或语音交互</p>
         <p class="mt-4">💡 <strong>提示：</strong>点击右上角设置按钮查看更多功能</p>
@@ -1375,8 +1372,11 @@
     </div>
     
     <div class="control-group">
-      <h3 class="text-xl">上传VRM模型</h3>
-      <div id="vrm-drop-zone" class="border-2 border-dashed p-6 text-center cursor-pointer">拖放VRM文件或点击<input type="file" id="vrm-file-input" accept=".vrm" class="hidden"/></div>
+      <h3 class="text-xl">VRM模型</h3>
+      <div class="p-4 text-center text-gray-600">
+        <p>模型已自动加载</p>
+        <p class="text-sm mt-2">默认模型路径: models/default.vrm</p>
+      </div>
     </div>
     
     <div class="control-group">
@@ -1670,7 +1670,6 @@ function throttle(func, limit) {
   };
 }
 
-面板
 function updatePerformanceStats() {
   performanceStats.frameCount++;
   const now = Date.now();
@@ -1748,8 +1747,8 @@ function startTutorial() {
   addMsg("系统", "📝 教程开始：请按照以下步骤操作");
   
   setTimeout(() => {
-    addMsg("系统", "步骤1：请拖拽一个 VRM 模型文件到界面中");
-    highlightElement('vrm-drop-zone');
+    addMsg("系统", "步骤1：VRM 模型已自动加载，可以直接开始使用");
+    // 模型已自动加载，跳过此步骤
   }, 1000);
   
   setTimeout(() => {
@@ -2710,9 +2709,21 @@ function applyInitialPose() {
   console.log('初始状态已应用');
 }
 
-function loadVRM(file){
+// 加载 VRM 模型（支持文件对象或 URL 路径）
+function loadVRM(fileOrUrl){
   showLoading(true, '正在加载 VRM...');
-  const url = URL.createObjectURL(file);
+  let url;
+  let isObjectURL = false;
+  
+  // 判断是文件对象还是 URL 字符串
+  if (fileOrUrl instanceof File || fileOrUrl instanceof Blob) {
+    url = URL.createObjectURL(fileOrUrl);
+    isObjectURL = true;
+  } else {
+    // 是 URL 字符串
+    url = fileOrUrl;
+  }
+  
   const loader = new THREE.GLTFLoader();
   loader.register(parser => new THREE.VRMLoaderPlugin(parser));
 
@@ -2722,7 +2733,12 @@ function loadVRM(file){
       if(vrm && vrm.scene){ try{ scene.remove(vrm.scene); }catch(e){} vrm = null; }
 
       vrm = gltf.userData.vrm;
-      if(!vrm){ console.error('加载结果中没有 vrm 对象'); showLoading(false, '加载失败：非VRM'); URL.revokeObjectURL(url); return; }
+      if(!vrm){ 
+        console.error('加载结果中没有 vrm 对象'); 
+        showLoading(false, '加载失败：非VRM'); 
+        if(isObjectURL) URL.revokeObjectURL(url); 
+        return; 
+      }
 
       scene.add(vrm.scene);
       vrm.scene.position.set(0,0,0);
@@ -2790,12 +2806,14 @@ function loadVRM(file){
       showLoading(false);
       updateServiceStatus('vrm', 'error', 'VRM 模型加载失败');
     }
-    URL.revokeObjectURL(url);
+    // 只有对象 URL 才需要清理
+    if(isObjectURL) URL.revokeObjectURL(url);
   }, undefined, err=>{ 
     console.error('GLTFLoader error', err); 
     showLoading(false); 
     updateServiceStatus('vrm', 'error', 'VRM 模型加载失败');
-    URL.revokeObjectURL(url); 
+    // 只有对象 URL 才需要清理
+    if(isObjectURL) URL.revokeObjectURL(url); 
   });
 }
 
@@ -4101,35 +4119,8 @@ function initEvents(){
     document.getElementById('settings-panel').classList.add('settings-hidden');
   });
   
-  // VRM文件上传
-  document.getElementById('vrm-file-input').addEventListener('change', e => { 
-    if(e.target.files.length>0) loadVRM(e.target.files[0]); 
-  });
-  
-  // 新的控制面板中的VRM文件上传
-  const vrmFileInput = document.getElementById('vrm-file');
-  if (vrmFileInput) {
-    vrmFileInput.addEventListener('change', e => { 
-      if(e.target.files.length>0) {
-        loadVRM(e.target.files[0]);
-        // 更新状态显示
-        updateServiceStatus('vrm', 'connected', 'VRM 模型已加载');
-      }
-    });
-  }
-  
   // 模型控制事件监听器
   initModelControls();
-  
-  const drop = document.getElementById('vrm-drop-zone');
-  drop.addEventListener('click', ()=> document.getElementById('vrm-file-input').click());
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drop-zone-active'); });
-  drop.addEventListener('dragleave', e => drop.classList.remove('drop-zone-active'));
-  drop.addEventListener('drop', e => { 
-    e.preventDefault(); 
-    drop.classList.remove('drop-zone-active'); 
-    if(e.dataTransfer.files.length>0) loadVRM(e.dataTransfer.files[0]); 
-  });
 
   // 灯光设置
   document.getElementById('dir-light-intensity').addEventListener('input', e => directionalLight.intensity = parseFloat(e.target.value));
@@ -4221,7 +4212,6 @@ function initEvents(){
     startTutorial();
   });
   
-按钮
   document.getElementById('clear-performance').addEventListener('click', function() {
     performanceStats.apiResponseTime = {};
     performanceStats.frameCount = 0;
@@ -4388,8 +4378,8 @@ function updateServiceStatus(service, status, message = '') {
             }, 400);
           }
           
-          // 获取模型列表
-          fetchOllamaModels();
+          // 获取模型列表（首次连接时非静默模式）
+          fetchOllamaModels(false);
         }
         break;
       case 'connecting':
@@ -4432,8 +4422,19 @@ function updateServiceStatus(service, status, message = '') {
   }
 }
 
-// 获取Ollama模型列表
-async function fetchOllamaModels() {
+// 获取Ollama模型列表（隐式刷新，不打断用户操作）
+async function fetchOllamaModels(silent = false) {
+  const modelSelect = document.getElementById('ollama-model');
+  if (!modelSelect) return false;
+  
+  // 如果下拉菜单正在打开（用户正在操作），跳过刷新
+  if (document.activeElement === modelSelect) {
+    if (!silent) {
+      console.log('下拉菜单正在使用，跳过刷新');
+    }
+    return false;
+  }
+  
   try {
     const response = await fetch(`${OLLAMA_API}/api/tags`, {
       method: 'GET',
@@ -4444,32 +4445,57 @@ async function fetchOllamaModels() {
       const data = await response.json();
       const models = data.models || [];
       
-      // 更新模型选择器
-      const modelSelect = document.getElementById('ollama-model');
-      if (modelSelect) {
-        // 清空现有选项
-        modelSelect.innerHTML = '';
-        
-        if (models.length > 0) {
-          // 添加模型选项
-          models.forEach(model => {
-            const option = document.createElement('option');
-            option.value = model.name;
-            option.textContent = `${model.name} (${formatModelSize(model.size)})`;
-            modelSelect.appendChild(option);
-          });
-          
-          // 设置默认选择第一个模型
-          if (models.length > 0) {
-            modelSelect.value = models[0].name;
-          }
-        } else {
-          // 没有模型时显示提示
-          const option = document.createElement('option');
-          option.value = '';
-          option.textContent = '未找到可用模型';
-          modelSelect.appendChild(option);
+      // 保存当前选中的值
+      const currentValue = modelSelect.value;
+      const currentOptions = Array.from(modelSelect.options).map(opt => ({
+        value: opt.value,
+        text: opt.textContent
+      }));
+      
+      // 检查模型列表是否有变化
+      const modelNames = models.map(m => m.name).sort().join(',');
+      const currentModelNames = currentOptions
+        .filter(opt => opt.value)
+        .map(opt => opt.value.split(' ')[0]) // 提取模型名（去掉大小信息）
+        .sort()
+        .join(',');
+      
+      // 如果模型列表没有变化，不更新UI
+      if (modelNames === currentModelNames && models.length > 0) {
+        if (!silent) {
+          console.log('模型列表未变化，跳过UI更新');
         }
+        return true;
+      }
+      
+      // 更新模型选择器（只在有变化时）
+      modelSelect.innerHTML = '';
+      
+      if (models.length > 0) {
+        // 添加模型选项
+        models.forEach(model => {
+          const option = document.createElement('option');
+          option.value = model.name;
+          option.textContent = `${model.name} (${formatModelSize(model.size)})`;
+          modelSelect.appendChild(option);
+        });
+        
+        // 恢复之前选中的值，如果不存在则选择第一个
+        if (currentValue && models.some(m => m.name === currentValue)) {
+          modelSelect.value = currentValue;
+        } else if (models.length > 0) {
+          modelSelect.value = models[0].name;
+          // 如果值改变了，触发change事件
+          if (currentValue !== models[0].name) {
+            modelSelect.dispatchEvent(new Event('change'));
+          }
+        }
+      } else {
+        // 没有模型时显示提示
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '未找到可用模型';
+        modelSelect.appendChild(option);
       }
       
       return true;
@@ -4479,9 +4505,10 @@ async function fetchOllamaModels() {
   } catch (error) {
     console.error('获取Ollama模型失败:', error);
     
-    // 更新模型选择器显示错误
-    const modelSelect = document.getElementById('ollama-model');
-    if (modelSelect) {
+    // 只在当前没有选项或选项是错误提示时才更新
+    const currentOptions = Array.from(modelSelect.options);
+    if (currentOptions.length === 0 || 
+        (currentOptions.length === 1 && currentOptions[0].textContent.includes('获取模型失败'))) {
       modelSelect.innerHTML = '<option value="">获取模型失败</option>';
     }
     
@@ -4509,8 +4536,8 @@ async function monitorServices() {
     });
     if (response.ok) {
       updateServiceStatus('ollama', 'connected', 'Ollama 已连接');
-      // 连接成功时获取模型列表
-      await fetchOllamaModels();
+      // 连接成功时隐式获取模型列表（不打断用户操作）
+      await fetchOllamaModels(true); // silent = true
     } else {
       updateServiceStatus('ollama', 'disconnected', 'Ollama 未响应');
     }
@@ -4555,12 +4582,16 @@ function startServiceMonitoring() {
   // 立即检查一次
   monitorServices();
   
-  // 每30秒检查一次
+  // 每30秒检查一次（隐式刷新）
   setInterval(monitorServices, 30000);
   
-  // 当用户进行交互时也检查
-  document.addEventListener('click', () => {
-    setTimeout(monitorServices, 1000);
+  // 移除点击事件触发的刷新，避免频繁打断用户操作
+  // 只在页面可见性变化时刷新（用户切换标签页回来时）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      // 页面变为可见时，延迟刷新
+      setTimeout(monitorServices, 2000);
+    }
   });
 }
 
@@ -4786,6 +4817,15 @@ function initModelControls() {
   });
 }
 
+// 自动加载默认 VRM 模型
+function loadDefaultVRM() {
+  // 默认模型路径，可以修改为实际的模型路径
+  const defaultModelPath = 'models/default.vrm';
+  
+  // 尝试加载默认模型
+  loadVRM(defaultModelPath);
+}
+
 async function initAll() {
   initScene(); 
   initEvents();
@@ -4794,6 +4834,9 @@ async function initAll() {
   initApiSettings();
   
   initChatTTSControls();
+  
+  // 自动加载默认 VRM 模型
+  loadDefaultVRM();
   
   // 加载对话历史
   loadConversationHistory();

@@ -4,6 +4,7 @@
 import os, re
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing_extensions import Annotated
 from typing import List
 from enum import Enum
@@ -36,12 +37,31 @@ else:
     device = "cpu"
     print(f"⚠️  CUDA 不可用，使用 CPU 设备")
 
-m, kwargs = SenseVoiceSmall.from_pretrained(model=model_dir, device=device)
-m.eval()
+try:
+    print(f"📦 正在加载模型: {model_dir}")
+    print(f"📂 当前工作目录: {os.getcwd()}")
+    m, kwargs = SenseVoiceSmall.from_pretrained(model=model_dir, device=device)
+    m.eval()
+    print(f"✅ 模型加载成功")
+except Exception as e:
+    print(f"❌ 模型加载失败: {e}")
+    import traceback
+    print(f"详细错误信息:")
+    traceback.print_exc()
+    raise
 
 regex = r"<\|.*\|>"
 
 app = FastAPI()
+
+# 添加 CORS 中间件，允许跨域请求
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源，生产环境建议指定具体域名
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -58,6 +78,26 @@ async def root():
         </body>
     </html>
     """
+
+
+@app.get("/health")
+async def health_check():
+    """健康检查端点"""
+    try:
+        # 检查模型是否已加载
+        model_loaded = m is not None and hasattr(m, 'eval')
+        return {
+            "status": "healthy",
+            "service": "SenseVoice",
+            "model_loaded": model_loaded,
+            "device": device
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "service": "SenseVoice",
+            "error": str(e)
+        }
 
 
 @app.post("/api/v1/asr")
@@ -107,5 +147,13 @@ async def turn_audio_to_text(
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=50000)
+    
+    try:
+        print(f"🚀 启动 SenseVoice 服务...")
+        print(f"📡 监听地址: 0.0.0.0:50000")
+        uvicorn.run(app, host="0.0.0.0", port=50000)
+    except Exception as e:
+        print(f"❌ 服务启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+        input("按 Enter 键退出...")

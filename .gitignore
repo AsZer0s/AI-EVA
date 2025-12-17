@@ -168,3 +168,4 @@ crash_dumps/
 # 项目特定的大文件
 large_files/
 big_data/
+python-portable/

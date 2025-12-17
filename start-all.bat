@@ -8,16 +8,26 @@ echo    AI-EVA Demo 一键启动脚本
 echo ========================================
 echo.
 
-:: 检查 Python 环境
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo ❌ 错误：未找到 Python 环境
-    echo 请先安装 Python 3.8+ 并添加到 PATH
-    pause
-    exit /b 1
+:: 优先使用便携式 Python 环境
+set PYTHON_EXE=python.exe
+if exist "python-portable\python.exe" (
+    set PYTHON_EXE=python-portable\python.exe
+    echo ✅ 使用便携式 Python 环境
+) else (
+    :: 检查系统 Python 环境
+    python --version >nul 2>&1
+    if errorlevel 1 (
+        echo ❌ 错误：未找到 Python 环境
+        echo.
+        echo 💡 解决方案：
+        echo    1. 运行 setup_python_env.bat 配置便携式 Python 环境
+        echo    2. 或安装 Python 3.8+ 并添加到 PATH
+        echo.
+        pause
+        exit /b 1
+    )
+    echo ✅ 使用系统 Python 环境
 )
-
-echo ✅ Python 环境检查通过
 
 :: 检查依赖
 echo.
@@ -83,7 +93,7 @@ if not exist "logs" mkdir logs
 
 :: 启动 ChatTTS 服务
 echo [1/4] 启动 ChatTTS 服务 (端口 9966)...
-start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& uvicorn chattts_api:app --host 0.0.0.0 --port 9966"
+start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m uvicorn chattts_api:app --host 0.0.0.0 --port 9966"
 
 :: 等待 ChatTTS 启动
 echo    等待服务启动中...
@@ -100,7 +110,7 @@ if errorlevel 1 (
 :: 启动 SenseVoice 服务
 echo [2/4] 启动 SenseVoice 服务 (端口 50000)...
 if exist "SenseVoice\api.py" (
-    start "SenseVoice" cmd /k "title SenseVoice服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0SenseVoice ^&^& python api.py"
+    start "SenseVoice" cmd /k "title SenseVoice服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0SenseVoice ^&^& \"%PYTHON_EXE%\" api.py"
     echo    等待服务启动中...
     timeout /t 5 /nobreak >nul
 ) else (
@@ -110,7 +120,7 @@ if exist "SenseVoice\api.py" (
 
 :: 启动前端服务
 echo [3/4] 启动前端服务 (端口 8000)...
-start "Frontend" cmd /k "title 前端服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& python -m http.server 8000"
+start "Frontend" cmd /k "title 前端服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m http.server 8000"
 
 :: 等待前端启动
 echo    等待服务启动中...
@@ -144,7 +154,7 @@ echo.
 echo 💡 使用提示：
 echo    1. 所有服务已启动，请等待 5-10 秒让服务完全就绪
 echo    2. 浏览器将自动打开，如果没有请手动访问 http://localhost:8000
-echo    3. 首次使用需要上传 VRM 模型文件（拖拽到浏览器窗口）
+echo    3. VRM 模型已自动加载（默认路径: models/default.vrm）
 echo    4. 在设置面板中配置 AI 模型（需要先运行: ollama pull gemma2:2b）
 echo    5. 选择音色并开始对话
 echo.
