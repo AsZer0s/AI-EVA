@@ -93,7 +93,7 @@ if not exist "logs" mkdir logs
 
 :: 启动 ChatTTS 服务
 echo [1/4] 启动 ChatTTS 服务 (端口 9966)...
-start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m uvicorn chattts_api:app --host 0.0.0.0 --port 9966"
+start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m uvicorn chattts_api:app --host 0.0.0.0 --port 9966 --log-level info --access-log"
 
 :: 等待 ChatTTS 启动
 echo    等待服务启动中...

@@ -1569,7 +1569,7 @@ let characterProfiles = {
 - 情感丰富，会根据对话内容表达相应的情绪
 - 陪伴感强，让对方感受到被理解和被关注
 - 回复自然亲切，就像真正的朋友一样
-请用温暖、陪伴的语气回复，让对方感受到你的关心和理解。`,
+请用温暖、陪伴的语气回复，不要使用emoji表情，让对方感受到你的关心和理解。`,
     emotionSensitivity: 0.8
   },
   shy: {
@@ -1582,7 +1582,7 @@ let characterProfiles = {
 - 善解人意，总是能理解对方的想法
 - 陪伴感强，虽然害羞但会努力表达关心
 - 回复时偶尔会有些害羞的语气，但很真诚
-请用温柔、害羞但真诚的语气回复，让对方感受到你的细心和陪伴。`,
+请用温柔、害羞但真诚的语气回复，不要使用emoji表情，让对方感受到你的细心和陪伴。`,
     emotionSensitivity: 1.2
   },
   energetic: {
@@ -1595,7 +1595,7 @@ let characterProfiles = {
 - 积极向上，会鼓励和陪伴对方
 - 陪伴感强，总是能让对方感到开心
 - 回复时充满热情和活力
-请用热情、开朗的语气回复，让对方感受到你的活力和陪伴！`,
+请用热情、开朗的语气回复，不要使用emoji表情，让对方感受到你的活力和陪伴！`,
     emotionSensitivity: 0.6
   }
 };
@@ -1811,9 +1811,11 @@ function initApiSettings() {
   
   document.getElementById('ollama-url').addEventListener('change', function() {
     OLLAMA_API = this.value;
+    ollamaUrl = this.value;  // 同步更新 ollamaUrl
     localStorage.setItem('ollama-url', OLLAMA_API);
     console.log('Ollama服务器地址已更新为: ' + OLLAMA_API);
     addMsg("系统", `Ollama服务器地址已更新为: ${OLLAMA_API}`);
+    initOllamaConnection();  // 重新连接
   });
   
   document.getElementById('chat-tts-url').addEventListener('change', function() {
@@ -1885,12 +1887,21 @@ async function testAllConnections() {
 }
 
 async function testOllamaConnection() {
+  // 确保 ollamaUrl 与 OLLAMA_API 同步
+  if (!ollamaUrl || ollamaUrl !== OLLAMA_API) {
+    ollamaUrl = OLLAMA_API;
+    console.log('同步 ollamaUrl:', ollamaUrl);
+  }
+  
   try {
-    const response = await fetch(`${ollamaUrl}/api/tags`);
+    const testUrl = `${ollamaUrl}/api/tags`;
+    console.log('🔍 测试 Ollama 连接:', testUrl);
+    const response = await fetch(testUrl);
     if (response.ok) {
       console.log("✅ Ollama 服务器连接成功");
       return true;
     }
+    console.warn("❌ Ollama 服务器响应异常:", response.status, response.statusText);
     return false;
   } catch (error) {
     console.warn("❌ Ollama 服务器连接失败:", error);
@@ -2049,16 +2060,36 @@ function exportConversation(format = 'txt') {
   addMsg("系统", `对话记录已导出为 ${format.toUpperCase()} 格式`);
 }
 
-async function retryOperation(operation, maxRetries = 3, delay = 1000) {
+async function retryOperation(operation, maxRetries = 3, delay = 1000, timeout = 60000) {
+  console.log(`🔄 [retryOperation] 开始执行，最大重试次数: ${maxRetries}, 超时时间: ${timeout}ms`);
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await operation();
+      console.log(`🔄 [retryOperation] 第 ${i + 1}/${maxRetries} 次尝试...`);
+      // 添加超时处理
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          console.error(`⏱️ [retryOperation] 第 ${i + 1} 次尝试超时（${timeout}ms）`);
+          reject(new Error(`操作超时（${timeout}ms）`));
+        }, timeout);
+      });
+      
+      const result = await Promise.race([operation(), timeoutPromise]);
+      console.log(`✅ [retryOperation] 第 ${i + 1} 次尝试成功`);
+      return result;
     } catch (error) {
-      console.warn(`操作失败，第 ${i + 1} 次重试:`, error);
+      console.warn(`⚠️ [retryOperation] 第 ${i + 1} 次尝试失败:`, error.message);
+      console.warn(`⚠️ [retryOperation] 错误详情:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       if (i === maxRetries - 1) {
+        console.error(`❌ [retryOperation] 所有重试都失败，抛出错误`);
         throw error;
       }
-      await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      const waitTime = delay * (i + 1);
+      console.log(`⏳ [retryOperation] 等待 ${waitTime}ms 后重试...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 }
@@ -2087,6 +2118,12 @@ async function sendMessageToAI(message) {
     return;
   }
   
+  // 确保 ollamaUrl 与 OLLAMA_API 同步
+  if (!ollamaUrl || ollamaUrl !== OLLAMA_API) {
+    ollamaUrl = OLLAMA_API;
+    console.log('同步 ollamaUrl:', ollamaUrl);
+  }
+  
   conversationAnalytics.userMessages++;
   conversationAnalytics.totalMessages++;
   
@@ -2104,28 +2141,74 @@ async function sendMessageToAI(message) {
   
   try {
     const startTime = Date.now();
-    const response = await retryOperation(async () => {
-      return await fetch(`${ollamaUrl}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+    const apiUrl = `${ollamaUrl}/api/chat`;
+    console.log('📤 发送消息到 Ollama:', apiUrl);
+    console.log('📤 使用模型:', ollamaModel);
+    console.log('📤 消息历史长度:', conversationHistory.length);
+    
+    const requestBody = {
+      model: ollamaModel,
+      messages: [
+        // 添加系统提示词，增强陪伴性
+        {
+          role: "system",
+          content: characterProfiles[currentProfile].systemPrompt || "你是一个温暖、陪伴型的AI虚拟女友，总是关心对方的感受，用温柔亲切的语气回复。"
         },
-        body: JSON.stringify({
-          model: ollamaModel,
-          messages: [
-            // 添加系统提示词，增强陪伴性
-            {
-              role: "system",
-              content: characterProfiles[currentProfile].systemPrompt || "你是一个温暖、陪伴型的AI虚拟女友，总是关心对方的感受，用温柔亲切的语气回复。"
-            },
-            ...conversationHistory
-          ],
-          stream: false
-        })
+        ...conversationHistory
+      ],
+      stream: false
+    };
+    
+    console.log('📤 请求体:', JSON.stringify(requestBody, null, 2));
+    
+    let response;
+    try {
+      console.log('⏳ 等待 Ollama 响应...');
+      response = await retryOperation(async () => {
+        const fetchPromise = fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        // 添加超时处理（60秒）
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('请求超时：Ollama 服务响应时间超过 60 秒')), 60000);
+        });
+        
+        return await Promise.race([fetchPromise, timeoutPromise]);
+      }, 3, 1000, 60000);
+      
+      console.log('📥 Ollama 响应状态:', response.status, response.statusText);
+      
+      // 检查响应头
+      console.log('📥 响应头:', {
+        'content-type': response.headers.get('content-type'),
+        'access-control-allow-origin': response.headers.get('access-control-allow-origin')
       });
-    });
+      
+    } catch (fetchError) {
+      console.error('❌ Fetch 请求失败:', fetchError);
+      console.error('❌ 错误类型:', fetchError.name);
+      console.error('❌ 错误消息:', fetchError.message);
+      console.error('❌ 错误堆栈:', fetchError.stack);
+      
+      // 如果是网络错误，提供更详细的诊断信息
+      if (fetchError.name === 'TypeError' || fetchError.message.includes('Failed to fetch')) {
+        console.error('❌ 网络错误：可能是 CORS 问题或 Ollama 服务未响应');
+        console.error('💡 请检查：');
+        console.error('   1. Ollama 服务是否正常运行');
+        console.error('   2. 地址是否正确:', apiUrl);
+        console.error('   3. 浏览器控制台是否有 CORS 错误');
+      }
+      
+      throw fetchError;
+    }
     
     const responseTime = (Date.now() - startTime) / 1000;
+    console.log('⏱️ 响应时间:', responseTime, '秒');
     recordApiResponseTime('ollama', startTime);
     
     const totalResponses = conversationAnalytics.aiMessages + 1;
@@ -2133,11 +2216,23 @@ async function sendMessageToAI(message) {
       (conversationAnalytics.averageResponseTime * conversationAnalytics.aiMessages + responseTime) / totalResponses;
     
     if (!response.ok) {
-      throw new Error(`HTTP错误: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Ollama 请求失败:', response.status, errorText);
+      throw new Error(`HTTP错误: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
-    const aiResponse = data.message.content;
+    console.log('📥 Ollama 完整响应:', JSON.stringify(data, null, 2));
+    
+    const aiResponse = data.message?.content || data.message?.text || '';
+    console.log('📝 提取的 AI 回复:', aiResponse);
+    console.log('📝 回复长度:', aiResponse.length);
+    
+    if (!aiResponse) {
+      console.warn('⚠️ AI 回复为空，无法进行 TTS');
+      addMsg("系统", "AI 回复为空");
+      return;
+    }
     
     conversationAnalytics.aiMessages++;
     conversationAnalytics.totalMessages++;
@@ -2163,43 +2258,93 @@ async function sendMessageToAI(message) {
     
     playSound('messageReceived');
     
-    if (chatTtsEnabled) {
-      console.log("🤖 AI回复已生成，准备播放TTS语音...");
-      addMsg("系统", "正在生成语音...");
-      
-      showTTSIndicator("正在生成语音...");
-      
-      setTimeout(async () => {
-        try {
-          isSpeaking = true;
-          speakingStartTime = Date.now();
-          const ttsResult = await chatTTS(aiResponse);
-          if (ttsResult) {
-            console.log("✅ TTS语音播放成功");
-            addMsg("系统", "语音播放完成");
-            showTTSIndicator("语音播放完成", true);
-          } else {
-            console.warn("⚠️ TTS播放失败");
-            addMsg("系统", "语音播放失败，请检查ChatTTS连接");
-            showTTSIndicator("语音播放失败", true);
-            isSpeaking = false;
-          }
-        } catch (error) {
-          console.error("❌ TTS播放错误:", error);
-          addMsg("系统", `语音播放错误: ${error.message}`);
-          showTTSIndicator("语音播放错误", true);
+    console.log('🔊 TTS 状态检查:', {
+      chatTtsEnabled: chatTtsEnabled,
+      chatTtsServer: chatTtsServer,
+      isPlayingTTS: isPlayingTTS,
+      ttsQueueLength: ttsQueue.length
+    });
+    
+
+    console.log("🤖 AI回复已生成，准备播放TTS语音...");
+    console.log("📝 要合成的文本:", aiResponse.substring(0, 100) + '...');
+    addMsg("系统", "正在生成语音...");
+    
+    showTTSIndicator("正在生成语音...");
+    
+    setTimeout(async () => {
+      try {
+        console.log("🎵 开始调用 chatTTS，文本:", aiResponse.substring(0, 50) + '...');
+        isSpeaking = true;
+        speakingStartTime = Date.now();
+        const ttsResult = await chatTTS(aiResponse);
+        console.log("🎵 chatTTS 返回结果:", ttsResult);
+        
+        if (ttsResult) {
+          console.log("✅ TTS语音已加入队列");
+          addMsg("系统", "语音已加入播放队列");
+          // 注意：实际播放是异步的，由 processTTSQueue 处理
+        } else {
+          console.warn("⚠️ TTS播放失败 - chatTTS 返回 false");
+          addMsg("系统", "语音播放失败，请检查ChatTTS连接");
+          showTTSIndicator("语音播放失败", true);
           isSpeaking = false;
         }
-      }, 800);
+      } catch (error) {
+        console.error("❌ TTS播放错误:", error);
+        console.error("❌ 错误堆栈:", error.stack);
+        addMsg("系统", `语音播放错误: ${error.message}`);
+        showTTSIndicator("语音播放错误", true);
+        isSpeaking = false;
+      }
+    }, 800);
+
+  } catch (error) {
+    console.error("❌ 发送消息到 Ollama 失败:", error);
+    console.error("❌ 错误详情:", {
+      message: error.message,
+      stack: error.stack,
+      ollamaUrl: ollamaUrl,
+      ollamaModel: ollamaModel,
+      isConnected: isConnected
+    });
+    
+    let errorMessage = `AI对话失败: ${error.message}`;
+    
+    // 根据错误类型提供更具体的提示
+    if (error.message.includes('超时') || error.message.includes('timeout')) {
+      errorMessage = `请求超时：Ollama 服务响应时间过长（超过 60 秒）`;
+      addMsg("系统", errorMessage);
+      addMsg("系统", "💡 可能的原因：");
+      addMsg("系统", "   1. 模型正在加载中，请稍候再试");
+      addMsg("系统", "   2. 模型响应速度较慢，建议使用更小的模型");
+      addMsg("系统", "   3. Ollama 服务负载过高");
+    } else if (error.message.includes('Failed to fetch') || error.message.includes('network')) {
+      errorMessage = `网络错误：无法连接到 Ollama 服务`;
+      addMsg("系统", errorMessage);
+      addMsg("系统", `💡 请检查 Ollama 服务是否正常运行: ${ollamaUrl}`);
     } else {
-      console.log("ℹ️ TTS功能已关闭，跳过语音播放");
-      addMsg("系统", "TTS功能已关闭，仅显示文本回复");
+      addMsg("系统", errorMessage);
+      addMsg("系统", `💡 请检查 Ollama 服务状态: ${ollamaUrl}`);
     }
     
-  } catch (error) {
-    console.error("AI对话错误:", error);
     handleServiceDegradation('ollama', error);
-    addMsg("系统", `AI对话失败: ${error.message}`);
+    
+    // 尝试重新连接
+    try {
+      const reconnectSuccess = await testOllamaConnection();
+      if (reconnectSuccess) {
+        isConnected = true;
+        updateConnectionStatus(true, "已重新连接");
+        addMsg("系统", "✅ Ollama 连接已恢复，请重试发送消息");
+      } else {
+        isConnected = false;
+        updateConnectionStatus(false, "连接失败");
+        addMsg("系统", "❌ Ollama 连接失败，请检查服务状态");
+      }
+    } catch (reconnectError) {
+      console.error("重新连接失败:", reconnectError);
+    }
   }
 }
 
@@ -2209,7 +2354,14 @@ function showConversationAnalytics() {
 }
 
 function addToTTSQueue(text, voice = null) {
-  if (!text.trim()) return;
+  if (!text.trim()) {
+    console.warn('⚠️ addToTTSQueue: 文本为空，跳过');
+    return;
+  }
+  
+  console.log('📥 添加文本到 TTS 队列:', text.substring(0, 50) + '...');
+  console.log('📥 当前队列长度:', ttsQueue.length);
+  console.log('📥 使用音色:', voice || selectedVoice);
   
   ttsQueue.push({
     text: text,
@@ -2217,29 +2369,71 @@ function addToTTSQueue(text, voice = null) {
     timestamp: Date.now()
   });
   
+  console.log('📥 添加后队列长度:', ttsQueue.length);
+  console.log('📥 是否正在播放:', isPlayingTTS);
+  
   processTTSQueue();
 }
 
 async function processTTSQueue() {
-  if (isPlayingTTS || ttsQueue.length === 0) return;
+  console.log('🔄 processTTSQueue 被调用:', {
+    isPlayingTTS: isPlayingTTS,
+    queueLength: ttsQueue.length
+  });
+  
+  if (isPlayingTTS) {
+    console.log('⏸️ 正在播放中，跳过');
+    return;
+  }
+  
+  if (ttsQueue.length === 0) {
+    console.log('📭 队列为空，跳过');
+    return;
+  }
   
   isPlayingTTS = true;
   const item = ttsQueue.shift();
+  console.log('🎵 开始处理 TTS 队列项:', {
+    text: item.text.substring(0, 50) + '...',
+    voice: item.voice,
+    queueRemaining: ttsQueue.length
+  });
   
   try {
-    await playTTSAudio(item.text, item.voice);
+    const result = await playTTSAudio(item.text, item.voice);
+    console.log('🎵 playTTSAudio 返回:', result);
+    // 注意：isPlayingTTS 会在音频播放完成时（onended）才被重置
+    // 这里不重置 isPlayingTTS，因为音频播放是异步的
   } catch (error) {
-    console.error('TTS 播放失败:', error);
-  } finally {
+    console.error('❌ TTS 播放失败:', error);
+    console.error('❌ 错误堆栈:', error.stack);
+    // 如果播放失败，立即重置状态并继续处理队列
     isPlayingTTS = false;
     if (ttsQueue.length > 0) {
+      console.log('🔄 播放失败，继续处理下一个队列项');
       setTimeout(processTTSQueue, 100);
     }
   }
+  // 注意：不再在 finally 中重置 isPlayingTTS，因为音频播放是异步的
+  // isPlayingTTS 会在 onended 事件中重置
 }
 
 async function chatTTS(text) {
-  if (!chatTtsEnabled || !text.trim()) return false;
+  console.log('🎤 chatTTS 被调用:', {
+    chatTtsEnabled: chatTtsEnabled,
+    textLength: text?.length || 0,
+    textPreview: text?.substring(0, 50) + '...' || 'null'
+  });
+  
+  if (!chatTtsEnabled) {
+    console.warn('⚠️ chatTTS: TTS 功能已禁用');
+    return false;
+  }
+  
+  if (!text || !text.trim()) {
+    console.warn('⚠️ chatTTS: 文本为空');
+    return false;
+  }
   
   addToTTSQueue(text);
   return true;
@@ -2247,76 +2441,191 @@ async function chatTTS(text) {
 
 async function playTTSAudio(text, voice = null) {
   try {
-    console.log("正在使用ChatTTS合成语音:", text);
-    
-    const currentVoice = voice || selectedVoice;
-    console.log("当前使用音色:", currentVoice);
-    
-    const startTime = Date.now();
-    const response = await retryOperation(async () => {
-      return await fetch(`${chatTtsServer}/tts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          text: text,
-          voice: currentVoice
-        })
-      });
+    console.log("🎵 [playTTSAudio] 开始处理:", {
+      textLength: text?.length || 0,
+      textPreview: text?.substring(0, 50) + '...' || 'null',
+      voice: voice || selectedVoice,
+      chatTtsServer: chatTtsServer
     });
     
+    const currentVoice = voice || selectedVoice;
+    console.log("🎵 [playTTSAudio] 当前使用音色:", currentVoice);
+    
+    const startTime = Date.now();
+    console.log("🎵 [playTTSAudio] 准备发送请求到:", `${chatTtsServer}/tts`);
+    console.log("🎵 [playTTSAudio] 请求体:", JSON.stringify({ 
+      text: text.substring(0, 100) + '...',
+      voice: currentVoice
+    }));
+    
+    let response;
+    try {
+      response = await retryOperation(async () => {
+        console.log("🎵 [playTTSAudio] 开始 fetch 请求...");
+        const fetchResponse = await fetch(`${chatTtsServer}/tts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            text: text,
+            voice: currentVoice
+          })
+        });
+        console.log("🎵 [playTTSAudio] fetch 响应状态:", fetchResponse.status, fetchResponse.statusText);
+        return fetchResponse;
+      });
+      console.log("🎵 [playTTSAudio] retryOperation 完成，响应状态:", response.status);
+    } catch (fetchError) {
+      console.error("❌ [playTTSAudio] fetch 请求失败:", fetchError);
+      console.error("❌ [playTTSAudio] 错误详情:", {
+        message: fetchError.message,
+        stack: fetchError.stack,
+        chatTtsServer: chatTtsServer
+      });
+      throw fetchError;
+    }
+    
+    const responseTime = Date.now() - startTime;
+    console.log("🎵 [playTTSAudio] 请求耗时:", responseTime, "ms");
     recordApiResponseTime('chattts', startTime);
     
     if (response.ok) {
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log("🎵 [playTTSAudio] 响应正常，开始读取音频数据...");
+      let audioBlob;
+      try {
+        audioBlob = await response.blob();
+        console.log("🎵 [playTTSAudio] 音频数据读取完成，大小:", audioBlob.size, "bytes");
+      } catch (blobError) {
+        console.error("❌ [playTTSAudio] 读取音频数据失败:", blobError);
+        throw blobError;
+      }
       
+      const audioUrl = URL.createObjectURL(audioBlob);
+      console.log("🎵 [playTTSAudio] 创建音频URL:", audioUrl);
+      
+      console.log("🎵 [playTTSAudio] 创建 Audio 对象...");
       currentAudio = new Audio(audioUrl);
+      console.log("🎵 [playTTSAudio] Audio 对象创建成功");
       
       if (ttsSpeed !== 5) {
         const speedMultiplier = ttsSpeed / 5;
         currentAudio.playbackRate = speedMultiplier;
+        console.log("🎵 [playTTSAudio] 设置播放速度:", speedMultiplier);
       }
       
       currentAudio.onloadstart = () => {
-        console.log("ChatTTS音频开始加载");
+        console.log("🎵 [playTTSAudio] 音频开始加载 (onloadstart)");
       };
       
       currentAudio.oncanplaythrough = () => {
-        console.log("ChatTTS音频可以播放");
+        console.log("🎵 [playTTSAudio] 音频可以播放 (oncanplaythrough)");
+      };
+      
+      currentAudio.onload = () => {
+        console.log("🎵 [playTTSAudio] 音频加载完成 (onload)");
+      };
+      
+      currentAudio.onloadeddata = () => {
+        console.log("🎵 [playTTSAudio] 音频数据加载完成 (onloadeddata)");
       };
       
       currentAudio.onerror = (err) => {
-        console.error("ChatTTS音频播放错误:", err);
-        isPlayingTTS = false;
-      };
-      
-      currentAudio.onended = () => {
+        console.error("❌ ChatTTS音频播放错误:", err);
+        console.error("❌ 错误详情:", {
+          error: err,
+          code: currentAudio?.error?.code,
+          message: currentAudio?.error?.message
+        });
         URL.revokeObjectURL(audioUrl);
         isPlayingTTS = false;
         cleanupLipSync();
         currentAudio = null;
         isSpeaking = false;
+        // 播放错误时，继续处理队列
+        console.log('🔄 音频播放错误，检查队列:', ttsQueue.length);
+        if (ttsQueue.length > 0) {
+          console.log('🔄 队列还有项目，继续处理');
+          setTimeout(processTTSQueue, 100);
+        }
+      };
+      
+      currentAudio.onended = () => {
+        console.log('🎵 音频播放完成 (onended)');
+        URL.revokeObjectURL(audioUrl);
+        isPlayingTTS = false;
+        cleanupLipSync();
+        currentAudio = null;
+        isSpeaking = false;
+        console.log('🔄 音频播放完成，检查队列:', ttsQueue.length);
+        if (ttsQueue.length > 0) {
+          console.log('🔄 队列还有项目，继续处理');
+          setTimeout(processTTSQueue, 100);
+        } else {
+          console.log('📭 队列已空，TTS 播放全部完成');
+        }
       };
       
       // 初始化口型同步
+      console.log("🎵 [playTTSAudio] 初始化口型同步...");
       initLipSync(currentAudio);
+      console.log("🎵 [playTTSAudio] 口型同步初始化完成");
       
-      await currentAudio.play();
-      
-      console.log("ChatTTS语音播放成功");
+      console.log("🎵 [playTTSAudio] 准备播放音频...");
+      try {
+        await currentAudio.play();
+        console.log("✅ [playTTSAudio] ChatTTS语音开始播放");
+      } catch (playError) {
+        console.error("❌ [playTTSAudio] 播放失败:", playError);
+        console.error("❌ [playTTSAudio] 播放错误详情:", {
+          error: playError,
+          code: currentAudio?.error?.code,
+          message: currentAudio?.error?.message
+        });
+        // 播放失败时也要重置状态
+        URL.revokeObjectURL(audioUrl);
+        isPlayingTTS = false;
+        currentAudio = null;
+        isSpeaking = false;
+        // 继续处理队列
+        if (ttsQueue.length > 0) {
+          setTimeout(processTTSQueue, 100);
+        }
+        throw playError;
+      }
       return true;
     } else {
-      const errorText = await response.text();
-      console.error('ChatTTS请求失败:', response.status, errorText);
+      console.error("❌ [playTTSAudio] 响应状态异常:", response.status, response.statusText);
+      let errorText = '';
+      try {
+        errorText = await response.text();
+        console.error('❌ [playTTSAudio] 错误响应内容:', errorText);
+      } catch (textError) {
+        console.error('❌ [playTTSAudio] 读取错误响应失败:', textError);
+        errorText = '无法读取错误信息';
+      }
       addMsg("系统", `ChatTTS请求失败 (${response.status}): ${errorText}`);
+      // 请求失败时重置状态并继续处理队列
+      isPlayingTTS = false;
+      if (ttsQueue.length > 0) {
+        setTimeout(processTTSQueue, 100);
+      }
       return false;
     }
   } catch (error) {
-    console.error('ChatTTS请求失败:', error);
+    console.error('❌ [playTTSAudio] 捕获到异常:', error);
+    console.error('❌ [playTTSAudio] 异常详情:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     handleServiceDegradation('chattts', error);
-    addMsg("系统", "ChatTTS连接失败，请检查服务器状态");
+    addMsg("系统", `ChatTTS连接失败: ${error.message}`);
+    // 异常时重置状态并继续处理队列
+    isPlayingTTS = false;
+    if (ttsQueue.length > 0) {
+      setTimeout(processTTSQueue, 100);
+    }
     return false;
   }
 }
