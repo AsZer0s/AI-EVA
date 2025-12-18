@@ -60,10 +60,10 @@ if errorlevel 1 (
 echo.
 echo 🔍 检查服务端口...
 
-:: 检查 ChatTTS 端口
+:: 检查 IndexTTS2 端口
 netstat -an | findstr ":9966" >nul
 if not errorlevel 1 (
-    echo ⚠️  警告：端口 9966 已被占用，ChatTTS 服务可能无法启动
+    echo ⚠️  警告：端口 9966 已被占用，IndexTTS2 服务可能无法启动
 )
 
 :: 检查 SenseVoice 端口
@@ -91,20 +91,20 @@ echo.
 :: 创建日志目录
 if not exist "logs" mkdir logs
 
-:: 启动 ChatTTS 服务
-echo [1/4] 启动 ChatTTS 服务 (端口 9966)...
-start "ChatTTS" cmd /k "title ChatTTS服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m uvicorn chattts_api:app --host 0.0.0.0 --port 9966 --log-level info --access-log"
+:: 启动 IndexTTS2 服务
+echo [1/4] 启动 IndexTTS2 服务 (端口 9966)...
+start "IndexTTS2" cmd /k "title IndexTTS2服务 ^& chcp 65001 ^>nul ^& cd /d %~dp0 ^&^& \"%PYTHON_EXE%\" -m uvicorn indextts_api:app --host 0.0.0.0 --port 9966 --log-level info --access-log"
 
-:: 等待 ChatTTS 启动
+:: 等待 IndexTTS2 启动
 echo    等待服务启动中...
 timeout /t 5 /nobreak >nul
 
-:: 检查 ChatTTS 是否启动成功
+:: 检查 IndexTTS2 是否启动成功
 curl -s http://localhost:9966/ >nul 2>&1
 if errorlevel 1 (
-    echo    ⚠️  ChatTTS 服务可能启动失败，请检查 ChatTTS 窗口
+    echo    ⚠️  IndexTTS2 服务可能启动失败，请检查 IndexTTS2 窗口
 ) else (
-    echo    ✅ ChatTTS 服务启动成功
+    echo    ✅ IndexTTS2 服务启动成功
 )
 
 :: 启动 SenseVoice 服务
@@ -147,7 +147,7 @@ echo ========================================
 echo.
 echo 📋 服务状态：
 echo    • 前端界面：http://localhost:8000
-echo    • ChatTTS：  http://localhost:9966
+echo    • IndexTTS2：http://localhost:9966
 echo    • SenseVoice：http://localhost:50000
 echo    • Ollama：   http://localhost:11434
 echo.

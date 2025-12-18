@@ -27,7 +27,7 @@ echo.
 echo 📦 复制项目文件...
 copy /Y index.html "%PACKAGE_DIR%\"
 copy /Y config.py "%PACKAGE_DIR%\"
-copy /Y chattts_api.py "%PACKAGE_DIR%\"
+copy /Y indextts_api.py "%PACKAGE_DIR%\"
 copy /Y sensevoice_api.py "%PACKAGE_DIR%\"
 copy /Y requirements.txt "%PACKAGE_DIR%\"
 copy /Y requirements-gpu.txt "%PACKAGE_DIR%\"

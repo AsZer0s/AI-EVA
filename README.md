@@ -18,7 +18,7 @@
 
 ## 📖 项目简介
 
-AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** 的 3D 虚拟角色交互系统。通过整合 ChatTTS、Ollama、SenseVoice 等开源技术，实现了完整的多模态对话体验。
+AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** 的 3D 虚拟角色交互系统。通过整合 IndexTTS2、Ollama、SenseVoice 等开源技术，实现了完整的多模态对话体验。
 
 **适用场景：** 作为付费项目的免费 Demo 展示，演示 AI 虚拟角色的核心交互能力。
 
@@ -28,7 +28,7 @@ AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** �
 |------|------|------|
 | 🎨 前端渲染 | Three.js + three-vrm | VRM 3D 模型展示 |
 | 🧠 AI 对话 | Ollama | 本地大语言模型 |
-| 🎵 语音合成 | ChatTTS | 高质量 TTS 引擎 |
+| 🎵 语音合成 | IndexTTS2 | 高质量 TTS 引擎，支持语音克隆 |
 | 🎤 语音识别 | SenseVoice | 高精度 ASR 服务 |
 | ⚡ 后端框架 | FastAPI | 异步 Web 服务 |
 
@@ -49,7 +49,7 @@ AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** �
 - 本地部署，数据隐私安全
 
 **🎵 语音交互**
-- ChatTTS 40+ 种音色可选
+- IndexTTS2 支持语音克隆和情感控制
 - SenseVoice 高精度语音识别
 - 浏览器原生语音识别降级
 - 音频智能缓存机制
@@ -127,8 +127,8 @@ start-all.bat  # Windows
 如果需要分别启动各个服务：
 
 ```bash
-# 终端 1 - ChatTTS 服务（必需）
-uvicorn chattts_api:app --host 0.0.0.0 --port 9966
+# 终端 1 - IndexTTS2 服务（必需）
+uvicorn indextts_api:app --host 0.0.0.0 --port 9966
 
 # 终端 2 - SenseVoice 服务（可选）
 cd SenseVoice && python api.py
@@ -145,7 +145,7 @@ python -m http.server 8000
 | 服务 | 端口 | 状态检查 | 必需性 |
 |------|------|---------|--------|
 | 🌐 前端界面 | 8000 | http://localhost:8000 | ✅ 必需 |
-| 🎵 ChatTTS | 9966 | http://localhost:9966/ | ✅ 必需 |
+| 🎵 IndexTTS2 | 9966 | http://localhost:9966/ | ✅ 必需 |
 | 🧠 Ollama | 11434 | http://localhost:11434/api/tags | ✅ 必需 |
 | 🎤 SenseVoice | 50000 | http://localhost:50000/ | ⚠️ 可选 |
 
@@ -166,7 +166,7 @@ python -m http.server 8000
 
 3. **配置 AI 模型**
    - 设置 → Ollama 模型选择（如 `gemma2:2b`）
-   - 设置 → ChatTTS 音色选择（如 `1031.pt`）
+   - 设置 → IndexTTS2 音色选择（支持音频文件路径或默认音色）
 
 4. **开始对话**
    - 输入框输入文字，按 Enter 发送
@@ -180,7 +180,7 @@ python -m http.server 8000
 
 **⚙️ 设置面板**
 - Ollama 模型配置
-- ChatTTS 音色切换
+- IndexTTS2 音色切换（支持语音克隆）
 - 语速调节（0.5x-2.0x）
 - SenseVoice 开关
 - 音色实时预览
@@ -238,7 +238,7 @@ python -m http.server 8000
 
 ```bash
 # ========== 服务端口 ==========
-CHAT_TTS_PORT=9966
+TTS_PORT=9966
 SENSEVOICE_PORT=50000
 OLLAMA_PORT=11434
 
@@ -290,7 +290,7 @@ ollama pull qwen2.5:3b
 ```
 AI-EVA/
 ├── 📄 test0037.html              # 前端主界面
-├── 🐍 chattts_api.py             # ChatTTS API 服务
+├── 🐍 indextts_api.py             # IndexTTS2 API 服务
 ├── 🐍 sensevoice_api.py          # SenseVoice API 适配器
 ├── 🐍 config.py                  # 配置管理
 ├── 📝 start-all.bat              # 一键启动脚本
@@ -445,7 +445,7 @@ MAX_CONCURRENT_REQUESTS=10
 
 感谢以下开源项目：
 
-- [ChatTTS](https://github.com/2noise/ChatTTS) - 高质量 TTS 引擎
+- [IndexTTS2](https://github.com/index-tts/index-tts) - 高质量 TTS 引擎，支持语音克隆和情感控制
 - [Ollama](https://ollama.com/) - 本地大语言模型
 - [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) - 语音识别
 - [three-vrm](https://github.com/pixiv/three-vrm) - VRM 模型支持

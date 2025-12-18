@@ -17,8 +17,8 @@ class Config:
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # ========== 服务端口配置 ==========
-    CHAT_TTS_PORT = int(os.getenv("CHAT_TTS_PORT", 9966))
-    CHAT_TTS_HOST = os.getenv("CHAT_TTS_HOST", "127.0.0.1")
+    TTS_PORT = int(os.getenv("TTS_PORT", 9966))
+    TTS_HOST = os.getenv("TTS_HOST", "127.0.0.1")
     
     SENSEVOICE_PORT = int(os.getenv("SENSEVOICE_PORT", 50000))
     SENSEVOICE_HOST = os.getenv("SENSEVOICE_HOST", "127.0.0.1")
@@ -46,7 +46,6 @@ class Config:
     
     # ========== 路径配置 ==========
     BASE_DIR = Path(__file__).parent
-    ASSETS_DIR = BASE_DIR / "asset"
     MODELS_DIR = BASE_DIR / "models"
     LOGS_DIR = BASE_DIR / "logs"
     
@@ -55,8 +54,8 @@ class Config:
     
     # ========== API 端点配置 ==========
     @property
-    def chat_tts_url(self):
-        return f"http://{self.CHAT_TTS_HOST}:{self.CHAT_TTS_PORT}"
+    def tts_url(self):
+        return f"http://{self.TTS_HOST}:{self.TTS_PORT}"
     
     @property
     def sensevoice_url(self):

@@ -22,7 +22,7 @@ class ServiceManager:
     def __init__(self):
         self.processes = {}
         self.ports = {
-            'ChatTTS': 9966,
+            'IndexTTS2': 9966,
             'SenseVoice': 50000,
             'Frontend': 8000,
             'Ollama': 11434
@@ -52,14 +52,14 @@ class ServiceManager:
         return False
     
     def start_chattts(self):
-        """启动 ChatTTS 服务"""
+        """启动 IndexTTS2 服务"""
         if self.check_port(self.ports['ChatTTS']):
             self.kill_port_process(self.ports['ChatTTS'])
             time.sleep(1)
         
         try:
             proc = subprocess.Popen(
-                [sys.executable, '-m', 'uvicorn', 'chattts_api:app', '--host', '0.0.0.0', '--port', '9966'],
+                [sys.executable, '-m', 'uvicorn', 'indextts_api:app', '--host', '0.0.0.0', '--port', '9966'],
                 cwd=os.getcwd(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -68,7 +68,7 @@ class ServiceManager:
             self.processes['ChatTTS'] = proc
             return True
         except Exception as e:
-            print(f"启动 ChatTTS 失败: {e}")
+            print(f"启动 IndexTTS2 失败: {e}")
             return False
     
     def start_sensevoice(self):
@@ -551,7 +551,7 @@ class AIEVALauncher:
                 
                 # 启动服务（异步执行）
                 services = [
-                    ('ChatTTS', self.service_manager.start_chattts),
+                    ('IndexTTS2', self.service_manager.start_chattts),
                     ('SenseVoice', self.service_manager.start_sensevoice),
                     ('Frontend', self.service_manager.start_frontend),
                     ('Ollama', self.service_manager.start_ollama)
@@ -664,7 +664,7 @@ class AIEVALauncher:
         def start_thread():
             try:
                 success = False
-                if service_name == 'ChatTTS':
+                if service_name == 'IndexTTS2':
                     success = self.service_manager.start_chattts()
                 elif service_name == 'SenseVoice':
                     success = self.service_manager.start_sensevoice()

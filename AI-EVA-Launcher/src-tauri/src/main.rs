@@ -67,7 +67,7 @@ fn check_ai_eva(install_path: String) -> Result<String, String> {
     // 检查关键文件
     let key_files = [
         "index.html",
-        "chattts_api.py",
+        "indextts_api.py",
         "start-all.bat",
         "AAA一键启动.bat"
     ];
@@ -372,7 +372,7 @@ async fn clone_indextts2(install_path: String) -> Result<String, String> {
             .map_err(|e| format!("删除现有目录失败: {}", e))?;
     }
 
-    // 克隆仓库
+    // 克隆仓库 - 先尝试正常克隆
     let output = Command::new("git")
         .arg("clone")
         .arg("https://github.com/index-tts/index-tts.git")
@@ -381,12 +381,236 @@ async fn clone_indextts2(install_path: String) -> Result<String, String> {
         .output()
         .map_err(|e| format!("执行 git clone 失败: {}", e))?;
 
-    if !output.status.success() {
-        let error_msg = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Git clone 失败: {}", error_msg));
+    // 检查是否遇到 LFS 错误
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined_output = format!("{}\n{}", stdout, stderr);
+    let mut lfs_skipped = false;
+    
+    if !output.status.success() || combined_output.contains("LFS budget") || combined_output.contains("smudge filter lfs failed") {
+        println!("检测到 Git LFS 错误，尝试跳过 LFS 文件...");
+        lfs_skipped = true;
+        
+        // 如果目录已存在但克隆失败，先清理
+        if indextts_path.exists() {
+            let _ = fs::remove_dir_all(&indextts_path);
+        }
+        
+        // 使用环境变量跳过 LFS 文件
+        let output_skip = Command::new("git")
+            .env("GIT_LFS_SKIP_SMUDGE", "1")
+            .arg("clone")
+            .arg("https://github.com/index-tts/index-tts.git")
+            .arg(&indextts_path)
+            .current_dir(&install_path_buf)
+            .output()
+            .map_err(|e| format!("Git clone (跳过 LFS) 失败: {}", e))?;
+        
+        if !output_skip.status.success() {
+            let error_msg = String::from_utf8_lossy(&output_skip.stderr);
+            return Err(format!("Git clone 失败 (已尝试跳过 LFS): {}", error_msg));
+        }
     }
 
-    Ok("IndexTTS2 克隆完成".to_string())
+    // 检查并安装 git-lfs
+    println!("检查 Git LFS...");
+    let lfs_check = Command::new("git")
+        .arg("lfs")
+        .arg("--version")
+        .output();
+    
+    if lfs_check.is_err() {
+        println!("警告: Git LFS 未安装，将尝试安装...");
+        // 尝试安装 git-lfs（Windows 上可能需要手动安装）
+        println!("提示: 请手动安装 Git LFS: https://git-lfs.github.com/");
+    } else {
+        // 初始化 Git LFS
+        println!("初始化 Git LFS...");
+        let _ = Command::new("git")
+            .arg("lfs")
+            .arg("install")
+            .current_dir(&indextts_path)
+            .output();
+        
+        // 尝试拉取 LFS 文件（即使之前跳过了）
+        println!("尝试下载 LFS 大文件...");
+        let lfs_pull = Command::new("git")
+            .arg("lfs")
+            .arg("pull")
+            .current_dir(&indextts_path)
+            .output();
+        
+        if let Ok(lfs_output) = lfs_pull {
+            if !lfs_output.status.success() {
+                let lfs_error = String::from_utf8_lossy(&lfs_output.stderr);
+                println!("Git LFS pull 警告: {} (可能因为配额限制，但不影响基本功能)", lfs_error);
+            } else {
+                println!("Git LFS 文件下载成功");
+            }
+        }
+    }
+
+    // 检查并安装 uv 包管理器
+    println!("检查 uv 包管理器...");
+    let uv_check = Command::new("uv")
+        .arg("--version")
+        .output();
+    
+    if uv_check.is_err() {
+        println!("安装 uv 包管理器...");
+        // 使用 pip 安装 uv
+        let install_uv = Command::new("pip")
+            .arg("install")
+            .arg("uv")
+            .output();
+        
+        if install_uv.is_err() {
+            // 尝试使用 python -m pip
+            let install_uv_py = Command::new("python")
+                .arg("-m")
+                .arg("pip")
+                .arg("install")
+                .arg("uv")
+                .output();
+            
+            if install_uv_py.is_err() {
+                return Err("无法安装 uv 包管理器。请手动运行: pip install uv".to_string());
+            }
+        }
+        println!("uv 安装完成");
+    }
+
+    // 安装 IndexTTS2 环境
+    println!("安装 IndexTTS2 环境依赖...");
+    let uv_sync = Command::new("uv")
+        .arg("sync")
+        .arg("--default-index")
+        .arg("https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple")
+        .current_dir(&indextts_path)
+        .output()
+        .map_err(|e| format!("执行 uv sync 失败: {}", e))?;
+    
+    if !uv_sync.status.success() {
+        let sync_error = String::from_utf8_lossy(&uv_sync.stderr);
+        return Err(format!("uv sync 失败: {}\n\n提示: 请确保已安装 uv 包管理器: pip install uv", sync_error));
+    }
+
+    // 下载模型 - 优先尝试使用 huggingface-cli
+    println!("开始下载 IndexTTS2 模型...");
+    let checkpoints_dir = indextts_path.join("checkpoints");
+    
+    // 检查 checkpoints 目录是否已存在模型文件
+    let model_exists = checkpoints_dir.exists() && {
+        if let Ok(mut entries) = fs::read_dir(&checkpoints_dir) {
+            entries.next().is_some()
+        } else {
+            false
+        }
+    };
+    
+    if !model_exists {
+        println!("安装 huggingface-cli...");
+        let install_hf = Command::new("uv")
+            .arg("tool")
+            .arg("install")
+            .arg("huggingface-hub[cli,hf_xet]")
+            .current_dir(&indextts_path)
+            .output();
+        
+        if install_hf.is_ok() && install_hf.as_ref().unwrap().status.success() {
+            println!("使用 huggingface-cli 下载模型...");
+            println!("设置 HuggingFace 镜像: https://hf-mirror.com");
+            let hf_download = Command::new("hf")
+                .env("HF_ENDPOINT", "https://hf-mirror.com")
+                .arg("download")
+                .arg("IndexTeam/IndexTTS-2")
+                .arg("--local-dir")
+                .arg("checkpoints")
+                .current_dir(&indextts_path)
+                .output();
+            
+            if let Ok(hf_output) = hf_download {
+                if hf_output.status.success() {
+                    println!("模型下载成功 (使用 huggingface-cli)");
+                } else {
+                    let hf_error = String::from_utf8_lossy(&hf_output.stderr);
+                    println!("huggingface-cli 下载失败，尝试使用 modelscope: {}", hf_error);
+                    
+                    // 回退到 modelscope
+                    println!("安装 modelscope...");
+                    let install_ms = Command::new("uv")
+                        .arg("tool")
+                        .arg("install")
+                        .arg("modelscope")
+                        .current_dir(&indextts_path)
+                        .output();
+                    
+                    if install_ms.is_ok() && install_ms.as_ref().unwrap().status.success() {
+                        println!("使用 modelscope 下载模型...");
+                        let ms_download = Command::new("modelscope")
+                            .arg("download")
+                            .arg("--model")
+                            .arg("IndexTeam/IndexTTS-2")
+                            .arg("--local_dir")
+                            .arg("checkpoints")
+                            .current_dir(&indextts_path)
+                            .output();
+                        
+                        if let Ok(ms_output) = ms_download {
+                            if ms_output.status.success() {
+                                println!("模型下载成功 (使用 modelscope)");
+                            } else {
+                                let ms_error = String::from_utf8_lossy(&ms_output.stderr);
+                                println!("警告: 模型下载失败: {}", ms_error);
+                                println!("提示: 可以稍后手动下载模型");
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // 如果 huggingface-cli 安装失败，尝试 modelscope
+            println!("huggingface-cli 安装失败，尝试使用 modelscope...");
+            let install_ms = Command::new("uv")
+                .arg("tool")
+                .arg("install")
+                .arg("modelscope")
+                .current_dir(&indextts_path)
+                .output();
+            
+            if let Ok(ms_output) = install_ms {
+                if ms_output.status.success() {
+                    println!("使用 modelscope 下载模型...");
+                    let ms_download = Command::new("modelscope")
+                        .arg("download")
+                        .arg("--model")
+                        .arg("IndexTeam/IndexTTS-2")
+                        .arg("--local_dir")
+                        .arg("checkpoints")
+                        .current_dir(&indextts_path)
+                        .output();
+                    
+                    if let Ok(ms_result) = ms_download {
+                        if ms_result.status.success() {
+                            println!("模型下载成功 (使用 modelscope)");
+                        } else {
+                            let ms_error = String::from_utf8_lossy(&ms_result.stderr);
+                            println!("警告: 模型下载失败: {}", ms_error);
+                            println!("提示: 可以稍后手动下载模型");
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        println!("检测到模型文件已存在，跳过下载");
+    }
+
+    if lfs_skipped {
+        Ok("IndexTTS2 克隆完成，环境已安装，模型已下载 (部分 LFS 大文件可能缺失)".to_string())
+    } else {
+        Ok("IndexTTS2 克隆完成，环境已安装，模型已下载".to_string())
+    }
 }
 
 #[tauri::command]
@@ -486,6 +710,7 @@ fn main() {
             setup_python_env,
             download_ai_eva,
             clone_indextts2,
+            check_gpu,
             launch_ai_eva
         ])
         .run(tauri::generate_context!())

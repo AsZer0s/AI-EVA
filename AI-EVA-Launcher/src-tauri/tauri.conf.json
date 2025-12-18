@@ -28,6 +28,10 @@
         "all": true,
         "request": true,
         "scope": ["https://**", "http://**"]
+      },
+      "dialog": {
+        "all": true,
+        "open": true
       }
     },
     "bundle": {

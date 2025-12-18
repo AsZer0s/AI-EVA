@@ -233,7 +233,10 @@
       </div>
       <div class="config-item">
         <label for="install-path">安装路径:</label>
-        <input type="text" id="install-path" placeholder="C:\AI-EVA" value="">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="text" id="install-path" placeholder="C:\AI-EVA" value="" style="flex: 1;">
+          <button id="btn-browse-path" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; white-space: nowrap;">浏览</button>
+        </div>
       </div>
     </div>
 
@@ -266,6 +269,7 @@
     <div class="button-group">
       <button class="btn-primary" id="btn-download">开始下载</button>
       <button class="btn-secondary" id="btn-launch" disabled>启动 AI-EVA</button>
+      <button class="btn-secondary" id="btn-check-gpu" disabled>检查 GPU</button>
     </div>
 
     <div class="log-container" id="log-container">
@@ -275,8 +279,10 @@
 
   <script type="module">
     import { invoke } from '@tauri-apps/api/tauri';
+    import { open } from '@tauri-apps/api/dialog';
 
     const installPathInput = document.getElementById('install-path');
+    const btnBrowsePath = document.getElementById('btn-browse-path');
     const btnDownload = document.getElementById('btn-download');
     const btnLaunch = document.getElementById('btn-launch');
     const logContainer = document.getElementById('log-container');
@@ -316,6 +322,42 @@
       }
     }).catch(err => {
       console.error('获取默认路径失败:', err);
+    });
+
+    // 点击浏览按钮时打开文件夹选择对话框
+    btnBrowsePath.addEventListener('click', async () => {
+      try {
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          title: '选择安装路径',
+          defaultPath: installPathInput.value || undefined
+        });
+
+        if (selected && typeof selected === 'string') {
+          installPathInput.value = selected;
+          addLog(`已选择安装路径: ${selected}`, 'success');
+        } else if (selected === null) {
+          // 用户取消了选择
+          addLog('已取消选择路径', 'info');
+        }
+      } catch (error) {
+        console.error('选择路径失败:', error);
+        addLog(`选择路径失败: ${error}`, 'error');
+      }
+    });
+
+    // 点击输入框时也打开文件夹选择对话框
+    installPathInput.addEventListener('click', async () => {
+      btnBrowsePath.click();
+    });
+
+    // 支持手动输入后验证路径
+    installPathInput.addEventListener('blur', () => {
+      const path = installPathInput.value.trim();
+      if (path) {
+        addLog(`安装路径已设置: ${path}`, 'info');
+      }
     });
 
     // GitHub 仓库地址（硬编码）
@@ -441,6 +483,7 @@
         addLog('IndexTTS2 克隆完成！', 'success');
 
         btnLaunch.disabled = false;
+        btnCheckGpu.disabled = false;
         addLog('所有资源下载完成！可以启动 AI-EVA 了。', 'success');
 
       } catch (error) {
@@ -471,6 +514,32 @@
       } catch (error) {
         addLog(`启动失败: ${error}`, 'error');
         alert(`启动失败: ${error}`);
+      }
+    });
+
+    btnCheckGpu.addEventListener('click', async () => {
+      const installPath = installPathInput.value.trim();
+      
+      if (!installPath) {
+        alert('请输入安装路径！');
+        return;
+      }
+
+      btnCheckGpu.disabled = true;
+      addLog('正在检查 GPU 环境...', 'info');
+
+      try {
+        const result = await invoke('check_gpu', {
+          installPath: installPath
+        });
+        addLog(result, 'success');
+        // 显示结果在弹窗中
+        alert(result);
+      } catch (error) {
+        addLog(`GPU 检查失败: ${error}`, 'error');
+        alert(`GPU 检查失败: ${error}`);
+      } finally {
+        btnCheckGpu.disabled = false;
       }
     });
   </script>

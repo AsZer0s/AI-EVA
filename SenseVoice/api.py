@@ -52,8 +52,8 @@ else:
 try:
     print(f"📦 正在加载模型: {model_dir}")
     print(f"📂 当前工作目录: {os.getcwd()}")
-    m, kwargs = SenseVoiceSmall.from_pretrained(model=model_dir, device=device)
-    m.eval()
+m, kwargs = SenseVoiceSmall.from_pretrained(model=model_dir, device=device)
+m.eval()
     print(f"✅ 模型加载成功")
 except Exception as e:
     print(f"❌ 模型加载失败: {e}")
@@ -166,7 +166,7 @@ async def turn_audio_to_text(
             # 如果 soundfile 失败，尝试使用 torchaudio（可能需要 torchcodec）
             try:
                 file_io.seek(0)
-                data_or_path_or_list, audio_fs = torchaudio.load(file_io)
+        data_or_path_or_list, audio_fs = torchaudio.load(file_io)
                 # 如果是多声道，取平均值
                 if len(data_or_path_or_list.shape) > 1:
                     data_or_path_or_list = data_or_path_or_list.mean(0)
@@ -182,7 +182,7 @@ async def turn_audio_to_text(
             data_tensor = data_or_path_or_list.unsqueeze(0)  # 添加通道维度 [1, samples]
             resampler = torchaudio.transforms.Resample(orig_freq=audio_fs, new_freq=TARGET_FS)
             data_or_path_or_list = resampler(data_tensor).squeeze(0)  # 移除通道维度
-        
+
         audios.append(data_or_path_or_list)
 
     if not keys:
@@ -222,11 +222,11 @@ async def turn_audio_to_text(
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     try:
         print(f"🚀 启动 SenseVoice 服务...")
         print(f"📡 监听地址: 0.0.0.0:50000")
-        uvicorn.run(app, host="0.0.0.0", port=50000)
+    uvicorn.run(app, host="0.0.0.0", port=50000)
     except Exception as e:
         print(f"❌ 服务启动失败: {e}")
         import traceback
