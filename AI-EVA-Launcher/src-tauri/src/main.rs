@@ -710,7 +710,6 @@ fn main() {
             setup_python_env,
             download_ai_eva,
             clone_indextts2,
-            check_gpu,
             launch_ai_eva
         ])
         .run(tauri::generate_context!())
