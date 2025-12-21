@@ -19,7 +19,8 @@
     
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: url('background.jpg') no-repeat center center fixed;
+      background-size: cover;
       color: #1a202c;
       line-height: 1.6;
       overflow: hidden;
@@ -35,9 +36,11 @@
       margin: 10px;
       box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
       overflow: hidden;
+      gap: 0;
     }
     
-    .control-panel {
+    /* 左侧设置面板 */
+    .left-panel {
       width: 320px;
       background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
       border-right: 1px solid rgba(226, 232, 240, 0.8);
@@ -50,34 +53,36 @@
       flex-shrink: 0;
     }
     
-    .control-panel::-webkit-scrollbar {
+    .left-panel::-webkit-scrollbar {
       width: 6px;
     }
     
-    .control-panel::-webkit-scrollbar-track {
+    .left-panel::-webkit-scrollbar-track {
       background: transparent;
     }
     
-    .control-panel::-webkit-scrollbar-thumb {
+    .left-panel::-webkit-scrollbar-thumb {
       background: #cbd5e0;
       border-radius: 3px;
     }
     
-    .main-area {
+    /* 中间3D模型区域 */
+    .center-panel {
       flex: 1;
+      position: relative;
+      background: url('background.jpg') no-repeat center center;
+      background-size: cover;
+      overflow: hidden;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      background: #ffffff;
-      min-width: 0;
-      overflow: hidden;
     }
     
     .scene-container {
       flex: 1;
       position: relative;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       overflow: hidden;
-      min-height: 300px;
+      min-height: 0;
     }
     
     #vrm-viewer {
@@ -86,16 +91,40 @@
       display: block;
     }
     
-    .chat-area {
-      height: 200px;
+    /* 右侧聊天栏 */
+    .right-panel {
+      width: 380px;
       background: #ffffff;
-      border-top: 1px solid rgba(226, 232, 240, 0.8);
+      border-left: 1px solid rgba(226, 232, 240, 0.8);
       display: flex;
       flex-direction: column;
-      backdrop-filter: blur(10px);
-      z-index: 10;
-      position: relative;
       flex-shrink: 0;
+      overflow: hidden;
+    }
+    
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    
+    .chat-header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    
+    .chat-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
     }
     
     .chat-messages {
@@ -104,6 +133,7 @@
       padding: 16px;
       scrollbar-width: thin;
       scrollbar-color: #cbd5e0 transparent;
+      min-height: 0;
     }
     
     .chat-messages::-webkit-scrollbar {
@@ -125,6 +155,7 @@
       background: #f8fafc;
       border-top: 1px solid rgba(226, 232, 240, 0.8);
       gap: 12px;
+      flex-shrink: 0;
     }
     
     .chat-input {
@@ -500,23 +531,19 @@
         flex-direction: row;
       }
       
-      .control-panel {
+      .left-panel {
         width: 350px;
         flex-shrink: 0;
       }
       
-      .main-area {
+      .center-panel {
         flex: 1;
         min-width: 0;
       }
       
-      .chat-area {
-        height: 220px;
-      }
-      
-      .scene-container {
-        flex: 1;
-        min-height: 400px;
+      .right-panel {
+        width: 400px;
+        flex-shrink: 0;
       }
     }
     
@@ -526,24 +553,20 @@
         margin: 8px;
       }
       
-      .control-panel {
+      .left-panel {
         width: 300px;
         flex-shrink: 0;
         padding: 20px;
       }
       
-      .main-area {
+      .center-panel {
         flex: 1;
         min-width: 0;
       }
       
-      .chat-area {
-        height: 180px;
-      }
-      
-      .scene-container {
-        flex: 1;
-        min-height: 350px;
+      .right-panel {
+        width: 350px;
+        flex-shrink: 0;
       }
     }
     
@@ -555,31 +578,32 @@
         height: calc(100vh - 10px);
       }
       
-      .control-panel {
+      .left-panel {
         width: 100%;
         height: auto;
-        max-height: 40vh;
+        max-height: 30vh;
         border-right: none;
         border-bottom: 1px solid rgba(226, 232, 240, 0.8);
         padding: 16px;
         flex-shrink: 0;
       }
       
-      .main-area {
+      .center-panel {
         flex: 1;
         min-height: 0;
-        display: flex;
-        flex-direction: column;
+      }
+      
+      .right-panel {
+        width: 100%;
+        height: 30vh;
+        border-left: none;
+        border-top: 1px solid rgba(226, 232, 240, 0.8);
+        flex-shrink: 0;
       }
       
       .scene-container {
         flex: 1;
         min-height: 250px;
-      }
-      
-      .chat-area {
-        height: 180px;
-        flex-shrink: 0;
       }
     }
     
@@ -590,9 +614,9 @@
         height: calc(100vh - 4px);
       }
       
-      .control-panel {
+      .left-panel {
         padding: 12px;
-        max-height: 35vh;
+        max-height: 25vh;
       }
       
       .control-section {
@@ -616,8 +640,8 @@
         flex: none;
       }
       
-      .chat-area {
-        height: 160px;
+      .right-panel {
+        height: 25vh;
       }
       
       .scene-container {
@@ -634,11 +658,11 @@
         display: flex !important;
       }
       
-      .control-panel.hidden {
+      .left-panel.hidden {
         display: none;
       }
       
-      .control-panel {
+      .left-panel {
         position: absolute;
         top: 0;
         left: 0;
@@ -650,33 +674,33 @@
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
       }
       
-      .control-panel.show {
+      .left-panel.show {
         display: block;
-        animation: slideInFromTop 0.3s ease-out;
+        animation: slideInFromLeft 0.3s ease-out;
       }
       
-      .control-panel.hide {
-        animation: slideOutToTop 0.3s ease-in;
+      .left-panel.hide {
+        animation: slideOutToLeft 0.3s ease-in;
       }
       
-      @keyframes slideInFromTop {
+      @keyframes slideInFromLeft {
         from {
-          transform: translateY(-100%);
+          transform: translateX(-100%);
           opacity: 0;
         }
         to {
-          transform: translateY(0);
+          transform: translateX(0);
           opacity: 1;
         }
       }
       
-      @keyframes slideOutToTop {
+      @keyframes slideOutToLeft {
         from {
-          transform: translateY(0);
+          transform: translateX(0);
           opacity: 1;
         }
         to {
-          transform: translateY(-100%);
+          transform: translateX(-100%);
           opacity: 0;
         }
       }
@@ -692,18 +716,27 @@
         color: #e2e8f0;
       }
       
-      .control-panel {
+      .left-panel {
         background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
         border-right-color: rgba(74, 85, 104, 0.3);
       }
       
-      .main-area {
+      .center-panel {
         background: #1a202c;
+      }
+      
+      .right-panel {
+        background: #1a202c;
+        border-left-color: rgba(74, 85, 104, 0.3);
       }
       
       .chat-area {
         background: #1a202c;
-        border-top-color: rgba(74, 85, 104, 0.3);
+      }
+      
+      .chat-header {
+        background: linear-gradient(135deg, #4c51bf 0%, #553c9a 100%);
+        border-bottom-color: rgba(74, 85, 104, 0.3);
       }
       
       .chat-input-area {
@@ -749,6 +782,35 @@
     .font-semibold { font-weight: 600; }
     .opacity-50 { opacity: 0.5; }
     .opacity-75 { opacity: 0.75; }
+    
+    /* 设置面板样式 */
+    #settings-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 400px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+      z-index: 3000;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    
+    #settings-panel.show {
+      transform: translateX(0);
+    }
+    
+    #settings-panel.settings-hidden {
+      transform: translateX(-100%);
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      #settings-panel {
+        background: rgba(26, 32, 44, 0.95);
+      }
+    }
     
     #voice-indicator { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 10px; z-index: 100; display: none; }
     .pulse { animation: pulse 1.5s infinite; }
@@ -929,21 +991,15 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- 左侧控制面板 -->
-    <div class="control-panel">
+    <!-- 左侧设置面板 -->
+    <div class="left-panel">
       <div class="control-section">
-        <h3>
-          <span class="material-icons-round">settings</span>
-          系统设置
-        </h3>
         <div class="control-buttons">
           <button id="open-settings" class="active">
             <span class="material-icons-round">tune</span>
-            设置面板
           </button>
           <button id="share-btn" title="分享">
             <span class="material-icons-round">share</span>
-            分享
           </button>
           <button id="toggle-control-panel" class="mobile-only" title="切换控制面板">
             <span class="material-icons-round">menu</span>
@@ -996,7 +1052,7 @@
         </div>
         <div class="status" id="tts-status">
           <span class="status-indicator" id="tts-indicator">●</span>
-          <span id="tts-text">ChatTTS 未连接</span>
+          <span id="tts-text">IndexTTS2 未连接</span>
         </div>
       </div>
       
@@ -1060,28 +1116,8 @@
           <!-- 缩放调整 -->
           <div class="slider-container">
             <label>缩放</label>
-            <input type="range" id="model-scale" min="0.1" max="3" step="0.1" value="1" />
-            <span id="model-scale-value">1.0</span>
-          </div>
-          
-          <!-- 动作控制 -->
-          <div class="control-buttons">
-            <button id="play-wave" class="btn-secondary">
-              <span class="material-icons-round">waving_hand</span>
-              挥手
-            </button>
-            <button id="play-nod" class="btn-secondary">
-              <span class="material-icons-round">keyboard_arrow_down</span>
-              点头
-            </button>
-            <button id="play-shake" class="btn-secondary">
-              <span class="material-icons-round">shake</span>
-              摇头
-            </button>
-            <button id="play-point" class="btn-secondary">
-              <span class="material-icons-round">pointing</span>
-              指向
-            </button>
+            <input type="range" id="model-scale" min="0.1" max="3" step="0.1" value="2.0" />
+            <span id="model-scale-value">2.0</span>
           </div>
           
           <!-- 表情控制 -->
@@ -1109,19 +1145,32 @@
       </div>
     </div>
     
-    <!-- 右侧主区域 -->
-    <div class="main-area">
-      <!-- 3D场景区域 -->
+    <!-- 中间3D模型区域 -->
+    <div class="center-panel">
       <div class="scene-container">
-    <canvas id="vrm-viewer"></canvas>
+        <canvas id="vrm-viewer"></canvas>
         <div class="loading-overlay" id="loading-overlay">
-      <div class="loading-spinner"></div>
+          <div class="loading-spinner"></div>
           <div id="loading-text">正在加载模型...</div>
+        </div>
       </div>
     </div>
-      
-      <!-- 聊天区域 -->
+    
+    <!-- 右侧聊天栏 -->
+    <div class="right-panel">
       <div class="chat-area">
+        <!-- 聊天头部 -->
+        <div class="chat-header">
+          <h2>EVA001</h2>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="connection-status" class="text-xs px-2 py-1 rounded-full bg-green-500 text-white" style="font-size: 11px;">已连接</span>
+            <button id="share-btn" style="background: transparent; border: none; color: white; cursor: pointer; padding: 4px;" title="分享">
+              <span class="material-icons-round" style="font-size: 18px;">share</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 聊天消息区域 -->
         <div class="chat-messages" id="chat-messages">
           <!-- 初始欢迎消息 -->
           <div class="message-container ai-message">
@@ -1137,11 +1186,9 @@
           <input id="chat-input" type="text" placeholder="输入消息..." class="chat-input" />
           <button id="send-message" class="btn-primary" title="发送">
             <span class="material-icons-round">send</span>
-            发送
           </button>
           <button id="voice-input-btn" class="btn-primary btn-secondary" title="语音输入">
             <span class="material-icons-round">mic</span>
-            语音
           </button>
         </div>
       </div>
@@ -1183,37 +1230,9 @@
     </div>
   </div>
 
-  <!-- 聊天面板 -->
-  <div class="absolute top-4 right-4 h-[calc(100%-2rem)] w-80 bg-white/70 dark:bg-black/50 backdrop-blur-sm rounded-2xl shadow-lg flex flex-col p-4 z-20">
-    <div class="flex-shrink-0 mb-4 flex justify-between items-center">
-      <h2 class="text-3xl font-bold">EVA001</h2>
-      <div class="flex items-center gap-2">
-        <span id="connection-status" class="text-xs px-2 py-1 rounded-full bg-green-500 text-white">已连接</span>
-        <button id="share-btn" class="p-1 rounded-full hover:bg-gray-100" title="分享">
-          <span class="material-icons text-sm">share</span>
-        </button>
-      </div>
-    </div>
-    <div id="chat-messages" class="flex-grow overflow-y-auto pr-2 space-y-2">
-      <!-- 初始欢迎消息 -->
-      <div class="message-container ai-message">
-        <div class="message-bubble">你好！我是你的AI伴侣。</div>
-      </div>
-      <div class="message-container ai-message">
-        <div class="message-bubble">你可以打字与我对话，也可以点击下方的麦克风按钮进行语音交流哦。</div>
-      </div>
-    </div>
-    <div class="mt-2">
-      <div class="relative">
-        <input id="chat-input" type="text" placeholder="输入消息..." class="w-full py-2 pl-3 pr-16 text-lg bg-background-light dark:bg-background-dark border rounded-lg" />
-        <button id="send-message" class="absolute inset-y-0 right-8 flex items-center pr-3" title="发送"><span class="material-icons">send</span></button>
-        <button id="voice-input-btn" class="absolute inset-y-0 right-0 flex items-center pr-3" title="语音输入"><span class="material-icons">mic</span></button>
-      </div>
-    </div>
-  </div>
 
-  <!-- 设置面板 -->
-  <div id="settings-panel" class="absolute top-0 left-0 h-full w-96 bg-white/80 dark:bg-black/60 backdrop-blur-xl shadow-2xl z-40 p-6 flex flex-col settings-hidden overflow-y-auto">
+  <!-- 设置面板（覆盖层） -->
+  <div id="settings-panel" class="absolute top-0 left-0 h-full w-96 bg-white/80 dark:bg-black/60 backdrop-blur-xl shadow-2xl z-40 p-6 flex flex-col settings-hidden overflow-y-auto" style="display: none;">
     <div class="flex items-center justify-between mb-8">
       <h2 class="text-3xl font-bold">设置面板</h2>
       <button id="close-settings" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><span class="material-icons">close</span></button>
@@ -1226,14 +1245,14 @@
         <p class="text-sm text-yellow-800">请根据您的服务配置正确地址：</p>
         <ul class="text-xs text-yellow-700 mt-2 list-disc list-inside">
           <li>Ollama默认端口: 11434</li>
-          <li>ChatTTS默认端口: 127.0.0.1:9966</li>
+          <li>IndexTTS2默认端口: 127.0.0.1:9966</li>
         </ul>
       </div>
       <label class="block mb-2">Ollama服务器地址 (AI对话)
         <input type="text" id="ollama-url" value="http://127.0.0.1:11434" class="w-full p-2 border rounded" />
         <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:8000 或 http://127.0.0.1:8000</div>
       </label>
-      <label class="block mb-2">ChatTTS服务器地址 (语音合成)
+      <label class="block mb-2">IndexTTS2服务器地址 (语音合成)
         <input type="text" id="chat-tts-url" value="http://127.0.0.1:9966" class="w-full p-2 border rounded" />
         <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:9966</div>
       </label>
@@ -1292,9 +1311,9 @@
       </div>
     </div>
     
-    <!-- ChatTTS语音控制 -->
+    <!-- IndexTTS2语音控制 -->
     <div class="control-group">
-      <h3 class="text-xl">ChatTTS语音设置</h3>
+      <h3 class="text-xl">IndexTTS2语音设置</h3>
       <div class="control-buttons">
         <button id="toggle-tts" class="bg-blue-500">
           <span class="material-icons">volume_up</span>
@@ -1466,13 +1485,13 @@ let CHAT_TTS_API = "http://127.0.0.1:9966";
 let SENSEVOICE_API = "http://127.0.0.1:50000";
 
 const INITIAL_POSE = {
-  leftUpperArm: { x: 0.3, y: 1, z: 1 },
-  leftLowerArm: { x: 0.2, y: 0.6, z: 0 },
-  leftHand: { x: 0, y: 0.5, z: 0 },
+  leftUpperArm: { x: 5.8, y: 4.5, z: 4.2 },
+  leftLowerArm: { x: -0.3, y: 0, z: 0 },
+  leftHand: { x: 0, y: 0, z: 0 },
   
-  rightUpperArm: { x: 0.3, y: -1, z: -1 },
-  rightLowerArm: { x: 0.2, y: -0.6, z: 0 },
-  rightHand: { x: 0, y: -0.5, z: 0 },
+  rightUpperArm: { x: -6, y: -5.2, z: -5 },
+  rightLowerArm: { x: -0.3, y: 0, z: 0 },
+  rightHand: { x: 0, y: 0, z: 0 },
   
   leftUpperLeg: { x: 0, y: 0, z: 0 },
   leftLowerLeg: { x: 0, y: 0, z: 0 },
@@ -1489,7 +1508,7 @@ const INITIAL_POSE = {
 let scene, camera, renderer, controls, vrm;
 let directionalLight, ambientLight;
 let clock = new THREE.Clock();
-let bones = {}, restPositions = {}, restRotations = {};
+let bones = {}, restPositions = {}, restRotations = {}, originalRestRotations = {};
 let isWalking = false, isEntering = false;
 
 let breathingEnabled = true;
@@ -1821,8 +1840,8 @@ function initApiSettings() {
   document.getElementById('chat-tts-url').addEventListener('change', function() {
     CHAT_TTS_API = this.value;
     localStorage.setItem('chat-tts-url', CHAT_TTS_API);
-    console.log('ChatTTS服务器地址已更新为: ' + CHAT_TTS_API);
-    addMsg("系统", `ChatTTS服务器地址已更新为: ${CHAT_TTS_API}`);
+    console.log('IndexTTS2服务器地址已更新为: ' + CHAT_TTS_API);
+    addMsg("系统", `IndexTTS2服务器地址已更新为: ${CHAT_TTS_API}`);
   });
   
   document.getElementById('sensevoice-url').addEventListener('change', function() {
@@ -1855,7 +1874,7 @@ function initApiSettings() {
       if (connected) {
         playAIResponse("你好，这是一个测试消息");
       } else {
-        addMsg("系统", "ChatTTS服务器未连接，请先启动ChatTTS服务器");
+        addMsg("系统", "IndexTTS2服务器未连接，请先启动IndexTTS2服务器");
       }
     });
   });
@@ -1870,7 +1889,7 @@ async function testAllConnections() {
   
   let html = '<div class="mt-2 space-y-1">';
   html += `<div class="${ollamaStatus ? 'text-green-500' : 'text-red-500'}">Ollama: ${ollamaStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
-  html += `<div class="${chatTtsStatus ? 'text-green-500' : 'text-red-500'}">ChatTTS: ${chatTtsStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
+  html += `<div class="${chatTtsStatus ? 'text-green-500' : 'text-red-500'}">IndexTTS2: ${chatTtsStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
   html += '</div>';
   
   resultsDiv.innerHTML = html;
@@ -1920,12 +1939,12 @@ async function testChatTTSConnection() {
     
     if (response.ok) {
       const data = await response.json();
-      console.log("✅ ChatTTS 服务器连接成功:", data);
+      console.log("✅ IndexTTS2 服务器连接成功:", data);
       return true;
     }
     return false;
   } catch (error) {
-    console.warn("❌ ChatTTS 服务器连接失败:", error);
+    console.warn("❌ IndexTTS2 服务器连接失败:", error);
     return false;
   }
 }
@@ -1958,7 +1977,7 @@ async function initOllamaConnection() {
     addMsg("系统", "Ollama连接成功");
   } else {
     isConnected = false;
-    updateConnectionStatus(false, "连接失败");
+    updateConnectionStatus(false, "");
     console.error("Ollama连接失败");
     addMsg("系统", "Ollama连接失败，请检查服务器地址和端口");
   }
@@ -1966,6 +1985,9 @@ async function initOllamaConnection() {
 
 function updateConnectionStatus(connected, message) {
   const statusElement = document.getElementById('connection-status');
+  if (message === "连接失败") {
+    message = "";
+  }
   if (connected) {
     statusElement.textContent = message;
     statusElement.className = "text-xs px-2 py-1 rounded-full bg-green-500 text-white";
@@ -2286,7 +2308,7 @@ async function sendMessageToAI(message) {
           // 注意：实际播放是异步的，由 processTTSQueue 处理
         } else {
           console.warn("⚠️ TTS播放失败 - chatTTS 返回 false");
-          addMsg("系统", "语音播放失败，请检查ChatTTS连接");
+          addMsg("系统", "语音播放失败，请检查IndexTTS2连接");
           showTTSIndicator("语音播放失败", true);
           isSpeaking = false;
         }
@@ -2339,7 +2361,7 @@ async function sendMessageToAI(message) {
         addMsg("系统", "✅ Ollama 连接已恢复，请重试发送消息");
       } else {
         isConnected = false;
-        updateConnectionStatus(false, "连接失败");
+        updateConnectionStatus(false, "");
         addMsg("系统", "❌ Ollama 连接失败，请检查服务状态");
       }
     } catch (reconnectError) {
@@ -2604,7 +2626,7 @@ async function playTTSAudio(text, voice = null) {
         console.error('❌ [playTTSAudio] 读取错误响应失败:', textError);
         errorText = '无法读取错误信息';
       }
-      addMsg("系统", `ChatTTS请求失败 (${response.status}): ${errorText}`);
+      addMsg("系统", `IndexTTS2请求失败 (${response.status}): ${errorText}`);
       // 请求失败时重置状态并继续处理队列
       isPlayingTTS = false;
       if (ttsQueue.length > 0) {
@@ -2620,7 +2642,7 @@ async function playTTSAudio(text, voice = null) {
       name: error.name
     });
     handleServiceDegradation('chattts', error);
-    addMsg("系统", `ChatTTS连接失败: ${error.message}`);
+    addMsg("系统", `IndexTTS2连接失败: ${error.message}`);
     // 异常时重置状态并继续处理队列
     isPlayingTTS = false;
     if (ttsQueue.length > 0) {
@@ -2681,7 +2703,7 @@ function initChatTTSControls() {
   });
   
   document.getElementById('test-tts').addEventListener('click', function() {
-    chatTTS("你好！这是ChatTTS语音测试。我正在使用文本转语音功能与你对话。");
+    chatTTS("你好！这是IndexTTS2语音测试。我正在使用文本转语音功能与你对话。");
   });
   
   document.getElementById('preview-voice').addEventListener('click', function() {
@@ -2705,11 +2727,11 @@ function toggleChatTTS() {
   if (chatTtsEnabled) {
     btn.innerHTML = '<span class="material-icons">volume_up</span><span>TTS:开</span>';
     btn.className = 'bg-blue-500';
-    addMsg("系统", "ChatTTS语音功能已开启 - AI回复将自动播放语音");
+    addMsg("系统", "IndexTTS2语音功能已开启 - AI回复将自动播放语音");
   } else {
     btn.innerHTML = '<span class="material-icons">volume_off</span><span>TTS:关</span>';
     btn.className = 'bg-gray-500';
-    addMsg("系统", "ChatTTS语音功能已关闭 - AI回复仅显示文本");
+    addMsg("系统", "IndexTTS2语音功能已关闭 - AI回复仅显示文本");
   }
 }
 
@@ -2977,10 +2999,13 @@ function toggleVoice() {
 
 function initScene(){
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-  camera.position.set(0,1.3,2);
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 2.6, 1.8);
   renderer = new THREE.WebGLRenderer({canvas:document.getElementById('vrm-viewer'),antialias:true,alpha:true});
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  const canvas = document.getElementById('vrm-viewer');
+  const canvasWidth = canvas.clientWidth || window.innerWidth;
+  const canvasHeight = canvas.clientHeight || window.innerHeight;
+  renderer.setSize(canvasWidth, canvasHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
 
   directionalLight = new THREE.DirectionalLight(0xffffff,0.7);
@@ -2989,27 +3014,28 @@ function initScene(){
   ambientLight = new THREE.AmbientLight(0xffffff,0.4);
   scene.add(ambientLight);
 
-  controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.target.set(0,1.2,0);
+  controls = new THREE.OrbitControls(camera, renderer.domElement)
+  controls.target.set(0, 2.6, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
+  controls.minDistance = 1.0;
+  controls.maxDistance = 3.0;
+  controls.minPolarAngle = Math.PI / 6;
+  controls.maxPolarAngle = Math.PI / 2.6;
   controls.update();
 
   animate();
 }
 
-// 应用初始状态函数
 function applyInitialPose() {
   for (const boneName in INITIAL_POSE) {
     if (bones[boneName] && restRotations[boneName]) {
       const initialRotation = INITIAL_POSE[boneName];
       
-      // 应用初始旋转（基于restRotations的偏移）
       bones[boneName].rotation.x = restRotations[boneName].x + initialRotation.x;
       bones[boneName].rotation.y = restRotations[boneName].y + initialRotation.y;
       bones[boneName].rotation.z = restRotations[boneName].z + initialRotation.z;
       
-      // 更新restRotations以包含初始状态（这样UI控制会基于初始状态）
       restRotations[boneName].x += initialRotation.x;
       restRotations[boneName].y += initialRotation.y;
       restRotations[boneName].z += initialRotation.z;
@@ -3018,7 +3044,29 @@ function applyInitialPose() {
   console.log('初始状态已应用');
 }
 
-// 加载 VRM 模型（支持文件对象或 URL 路径）
+// 强制应用手臂姿态（用于已加载的模型）
+function applyArmPose() {
+  if (!vrm || !bones.leftUpperArm || !bones.rightUpperArm) return;
+  
+  const armBones = ['leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'rightLowerArm', 'rightHand'];
+  
+  armBones.forEach(boneName => {
+    if (bones[boneName] && originalRestRotations[boneName] && INITIAL_POSE[boneName]) {
+      const initialRotation = INITIAL_POSE[boneName];
+      
+      // 基于原始的restRotations（不包含之前的偏移）应用姿态
+      bones[boneName].rotation.x = originalRestRotations[boneName].x + initialRotation.x;
+      bones[boneName].rotation.y = originalRestRotations[boneName].y + initialRotation.y;
+      bones[boneName].rotation.z = originalRestRotations[boneName].z + initialRotation.z;
+      
+      // 更新restRotations以包含初始状态
+      restRotations[boneName].x = originalRestRotations[boneName].x + initialRotation.x;
+      restRotations[boneName].y = originalRestRotations[boneName].y + initialRotation.y;
+      restRotations[boneName].z = originalRestRotations[boneName].z + initialRotation.z;
+    }
+  });
+}
+
 function loadVRM(fileOrUrl){
   showLoading(true, '正在加载 VRM...');
   let url;
@@ -3050,15 +3098,18 @@ function loadVRM(fileOrUrl){
       }
 
       scene.add(vrm.scene);
-      vrm.scene.position.set(0,0,0);
+      vrm.scene.position.set(0, 0, 0);
+      
+      // 放大模型（2.0倍）
+      vrm.scene.scale.setScalar(2.0);
       
       // 确保模型在场景中央，面向相机
       vrm.scene.rotation.y = 0; // 让模型面向相机（0度是面向相机）
       
-      // 强制重置相机位置，确保模型居中
-      camera.position.set(0, 1.3, 2);
-      camera.lookAt(0, 1.2, 0);
-      controls.target.set(0, 1.2, 0);
+      // 强制重置相机位置，聚焦在上半身（头部和肩膀）
+      camera.position.set(0, 2.6, 1.8);
+      camera.lookAt(0, 2.6, 0);
+      controls.target.set(0, 2.6, 0);
       controls.update();
 
       if(vrm.humanoid){
@@ -3077,13 +3128,26 @@ function loadVRM(fileOrUrl){
         for(const k in bones){ 
           if(bones[k]){ 
             restPositions[k] = bones[k].position.clone(); 
-            restRotations[k] = bones[k].rotation.clone(); 
+            restRotations[k] = bones[k].rotation.clone();
+            originalRestRotations[k] = bones[k].rotation.clone();
           } 
         }
 
         // ========== 应用初始状态 ==========
         applyInitialPose();
         // ========== 应用初始状态结束 ==========
+        
+        // 延迟应用手臂姿态，确保模型完全加载
+        setTimeout(() => {
+          applyArmPose();
+        }, 500);
+        
+        // 在动画循环中持续应用手臂姿态
+        setInterval(() => {
+          if (vrm && bones.leftUpperArm && bones.rightUpperArm) {
+            applyArmPose();
+          }
+        }, 1000);
 
         // 初始化骨骼控制UI
         initBoneControlsUI();
@@ -3531,7 +3595,24 @@ function startEntrance(){
   const startPos = new THREE.Vector3(8,0,0);
   const endPos = new THREE.Vector3(0,0,0);
   const duration = 800; const startTime = performance.now();
-  (function step(){ if(!vrm) return; const t = Math.min((performance.now()-startTime)/duration,1); vrm.scene.position.lerpVectors(startPos,endPos,t); if(t<1) requestAnimationFrame(step); else { isEntering=false; isWalking=false; } })();
+  (function step(){ 
+    if(!vrm) return; 
+    const t = Math.min((performance.now()-startTime)/duration,1); 
+    vrm.scene.position.lerpVectors(startPos,endPos,t); 
+    if(t<1) {
+      requestAnimationFrame(step);
+    } else { 
+      isEntering=false; 
+      isWalking=false;
+      // 确保模型最终位置在中心
+      vrm.scene.position.set(0, 0, 0);
+      // 确保相机聚焦在上半身（头部和肩膀）
+      camera.position.set(0, 2.6, 1.8);
+      camera.lookAt(0, 2.6, 0);
+      controls.target.set(0, 2.6, 0);
+      controls.update();
+    } 
+  })();
 }
 
 function updateBreathing(delta){
@@ -4379,6 +4460,18 @@ function updateProcedural(delta){
 }
 
 function animate(){ 
+  if (vrm && bones.leftUpperArm && bones.rightUpperArm && originalRestRotations.leftUpperArm) {
+    const armBones = ['leftUpperArm', 'leftLowerArm', 'rightUpperArm', 'rightLowerArm'];
+    armBones.forEach(boneName => {
+      if (bones[boneName] && originalRestRotations[boneName] && INITIAL_POSE[boneName]) {
+        const initialRotation = INITIAL_POSE[boneName];
+        bones[boneName].rotation.x = originalRestRotations[boneName].x + initialRotation.x;
+        bones[boneName].rotation.y = originalRestRotations[boneName].y + initialRotation.y;
+        bones[boneName].rotation.z = originalRestRotations[boneName].z + initialRotation.z;
+      }
+    });
+  }
+  
   requestAnimationFrame(animate); 
   const delta = clock.getDelta(); 
   
@@ -4422,10 +4515,18 @@ function sendMessage(message) {
 function initEvents(){
   // 设置面板开关
   document.getElementById('open-settings').addEventListener('click', ()=> {
-    document.getElementById('settings-panel').classList.remove('settings-hidden');
+    const panel = document.getElementById('settings-panel');
+    panel.style.display = 'flex';
+    panel.classList.remove('settings-hidden');
+    panel.classList.add('show');
   });
   document.getElementById('close-settings').addEventListener('click', ()=> {
-    document.getElementById('settings-panel').classList.add('settings-hidden');
+    const panel = document.getElementById('settings-panel');
+    panel.classList.remove('show');
+    panel.classList.add('settings-hidden');
+    setTimeout(() => {
+      panel.style.display = 'none';
+    }, 300);
   });
   
   // 模型控制事件监听器
@@ -4624,13 +4725,25 @@ function initEvents(){
   }, false);
 
   // 窗口变更
-  window.addEventListener('resize', ()=>{ 
+  function handleResize() {
     if(camera && renderer){ 
-      camera.aspect = window.innerWidth / window.innerHeight; 
+      // 获取canvas的实际尺寸（考虑中间面板的尺寸）
+      const canvas = document.getElementById('vrm-viewer');
+      if (!canvas) return;
+      
+      const canvasWidth = canvas.clientWidth || window.innerWidth;
+      const canvasHeight = canvas.clientHeight || window.innerHeight;
+      
+      camera.aspect = canvasWidth / canvasHeight; 
       camera.updateProjectionMatrix(); 
-      renderer.setSize(window.innerWidth, window.innerHeight); 
-    } 
-  });
+      renderer.setSize(canvasWidth, canvasHeight); 
+    }
+  }
+  
+  window.addEventListener('resize', handleResize);
+  
+  // 页面加载完成后也调用一次，确保初始尺寸正确
+  setTimeout(handleResize, 100);
 }
 
 function addMsg(sender, text, saveToHistory = true){ 
@@ -4854,7 +4967,7 @@ async function monitorServices() {
     updateServiceStatus('ollama', 'disconnected', 'Ollama 未连接');
   }
   
-  // 检查 ChatTTS 状态
+  // 检查 IndexTTS2 状态
   try {
     updateServiceStatus('tts', 'connecting');
     const response = await fetch(`${CHAT_TTS_API}/health`, {
@@ -4862,12 +4975,12 @@ async function monitorServices() {
       timeout: 3000
     });
     if (response.ok) {
-      updateServiceStatus('tts', 'connected', 'ChatTTS 已连接');
+      updateServiceStatus('tts', 'connected', 'IndexTTS2 已连接');
     } else {
-      updateServiceStatus('tts', 'disconnected', 'ChatTTS 未响应');
+      updateServiceStatus('tts', 'disconnected', 'IndexTTS2 未响应');
     }
   } catch (error) {
-    updateServiceStatus('tts', 'disconnected', 'ChatTTS 未连接');
+    updateServiceStatus('tts', 'disconnected', 'IndexTTS2 未连接');
   }
   
   // 检查 SenseVoice 状态
@@ -4907,33 +5020,33 @@ function startServiceMonitoring() {
 // 移动端控制面板切换
 function initMobileControlPanel() {
   const toggleBtn = document.getElementById('toggle-control-panel');
-  const controlPanel = document.querySelector('.control-panel');
+  const leftPanel = document.querySelector('.left-panel');
   
-  if (toggleBtn && controlPanel) {
+  if (toggleBtn && leftPanel) {
     let isVisible = false;
     
     toggleBtn.addEventListener('click', () => {
       if (isVisible) {
-        controlPanel.classList.add('hide');
+        leftPanel.classList.add('hide');
         setTimeout(() => {
-          controlPanel.classList.remove('show', 'hide');
-          controlPanel.classList.add('hidden');
+          leftPanel.classList.remove('show', 'hide');
+          leftPanel.classList.add('hidden');
         }, 300);
         isVisible = false;
       } else {
-        controlPanel.classList.remove('hidden', 'hide');
-        controlPanel.classList.add('show');
+        leftPanel.classList.remove('hidden', 'hide');
+        leftPanel.classList.add('show');
         isVisible = true;
       }
     });
     
     // 点击控制面板外部关闭
     document.addEventListener('click', (e) => {
-      if (isVisible && !controlPanel.contains(e.target) && !toggleBtn.contains(e.target)) {
-        controlPanel.classList.add('hide');
+      if (isVisible && !leftPanel.contains(e.target) && !toggleBtn.contains(e.target)) {
+        leftPanel.classList.add('hide');
         setTimeout(() => {
-          controlPanel.classList.remove('show', 'hide');
-          controlPanel.classList.add('hidden');
+          leftPanel.classList.remove('show', 'hide');
+          leftPanel.classList.add('hidden');
         }, 300);
         isVisible = false;
       }
@@ -5032,7 +5145,13 @@ function initModelControls() {
       if (vrm && vrm.scene) {
         vrm.scene.position.set(0, 0, 0);
         vrm.scene.rotation.set(0, 0, 0);
-        vrm.scene.scale.setScalar(1);
+        vrm.scene.scale.setScalar(2.0); // 使用放大后的默认缩放
+        
+        // 重置相机位置，聚焦在上半身（头部和肩膀）
+        camera.position.set(0, 2.6, 1.8);
+        camera.lookAt(0, 2.6, 0);
+        controls.target.set(0, 2.6, 0);
+        controls.update();
         
         // 重置滑块值
         document.getElementById('model-x').value = 0;
@@ -5041,7 +5160,7 @@ function initModelControls() {
         document.getElementById('model-rotation-x').value = 0;
         document.getElementById('model-rotation-y').value = 0;
         document.getElementById('model-rotation-z').value = 0;
-        document.getElementById('model-scale').value = 1;
+        document.getElementById('model-scale').value = 2.0;
         
         // 更新显示值
         document.getElementById('model-x-value').textContent = '0';
@@ -5050,7 +5169,7 @@ function initModelControls() {
         document.getElementById('model-rotation-x-value').textContent = '0°';
         document.getElementById('model-rotation-y-value').textContent = '0°';
         document.getElementById('model-rotation-z-value').textContent = '0°';
-        document.getElementById('model-scale-value').textContent = '1.0';
+        document.getElementById('model-scale-value').textContent = '2.0';
       }
     });
   }
@@ -5063,10 +5182,10 @@ function initModelControls() {
         vrm.scene.position.set(0, 0, 0);
         vrm.scene.rotation.set(0, 0, 0); // 面向相机
         
-        // 重置相机位置，确保模型居中
-        camera.position.set(0, 1.3, 2);
-        camera.lookAt(0, 1.2, 0);
-        controls.target.set(0, 1.2, 0);
+        // 重置相机位置，聚焦在上半身（头部和胸部）
+        camera.position.set(0, 1.4, 1.5);
+        camera.lookAt(0, 1.4, 0);
+        controls.target.set(0, 1.4, 0);
         controls.update();
         
         // 重置滑块值
@@ -5087,25 +5206,6 @@ function initModelControls() {
       }
     });
   }
-  
-  // 动作控制按钮
-  const actionButtons = [
-    { id: 'play-wave', action: 'wave' },
-    { id: 'play-nod', action: 'nod' },
-    { id: 'play-shake', action: 'shake' },
-    { id: 'play-point', action: 'point' }
-  ];
-  
-  actionButtons.forEach(({ id, action }) => {
-    const btn = document.getElementById(id);
-    if (btn) {
-      btn.addEventListener('click', () => {
-        if (vrm) {
-          playGesture(action);
-        }
-      });
-    }
-  });
   
   // 表情控制
   const expressionControls = ['expression-happy', 'expression-angry', 'expression-sad', 'expression-surprised'];
@@ -5196,11 +5296,6 @@ async function initAll() {
   } else {
     addMsg("系统", "❌ 系统初始化完成！请检查AI和语音服务器连接");
   }
-  
-  // 显示增强功能提示
-  setTimeout(() => {
-    addMsg("系统", "✨ 新功能: 多角色切换、场景氛围、对话分析等功能已启用！");
-  }, 5000);
 }
 
 // 启动

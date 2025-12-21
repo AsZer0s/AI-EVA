@@ -6,10 +6,26 @@ import hashlib
 import json
 import os
 import time
+import yaml
 from pathlib import Path
 from typing import Optional, Dict, Any
-from config import config
 from utils.logger import get_logger
+
+# 加载配置
+def _load_config():
+    """加载配置文件"""
+    config_path = Path(__file__).parent.parent / "config.yaml"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            pass
+    return {}
+
+_config = _load_config()
+performance_config = _config.get('performance', {})
+tts_config = _config.get('modules', {}).get('tts', {})
 
 logger = get_logger("audio_cache")
 
@@ -28,7 +44,8 @@ class AudioCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # 设置最大缓存大小
-        self.max_size_mb = max_size_mb or config.AUDIO_CACHE_SIZE
+        default_cache_size = tts_config.get('audio_cache_size', 100)
+        self.max_size_mb = max_size_mb or default_cache_size
         self.max_size_bytes = self.max_size_mb * 1024 * 1024
         
         # 缓存索引文件

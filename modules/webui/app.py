@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-AI-EVA Demo Web 启动器
-基于 Web 的服务管理界面，无需 tkinter
+WebUI 模块 - 前端交互界面
+基于 FastAPI 的服务管理界面
 """
 import subprocess
 import time
@@ -14,6 +14,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import webbrowser
 import threading
+import yaml
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -28,14 +29,33 @@ except ImportError:
     from fastapi.staticfiles import StaticFiles
     import uvicorn
 
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# 加载配置
+def load_config():
+    """加载配置文件"""
+    config_path = project_root / "config.yaml"
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    return {}
+
+config = load_config()
+webui_config = config.get('modules', {}).get('webui', {})
+asr_config = config.get('modules', {}).get('asr', {})
+tts_config = config.get('modules', {}).get('tts', {})
+llm_config = config.get('modules', {}).get('llm', {})
+
 class ServiceManager:
     """服务管理器"""
     def __init__(self):
         self.processes = {}
         self.ports = {
-            'IndexTTS2': 9966,
-            'SenseVoice': 50000,
-            'Frontend': 8000,
+            'TTS': tts_config.get('port', 9966),
+            'ASR': asr_config.get('port', 50000),
+            'Frontend': webui_config.get('port', 8000),
             'Ollama': 11434
         }
         self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="AI-EVA")
@@ -63,62 +83,52 @@ class ServiceManager:
             print(f"终止端口 {port} 的进程失败: {e}")
         return False
     
-    def start_chattts(self):
-        """启动 IndexTTS2 服务"""
-        if self.check_port(self.ports['ChatTTS']):
-            self.kill_port_process(self.ports['ChatTTS'])
+    def start_tts(self):
+        """启动 TTS 服务"""
+        port = self.ports['TTS']
+        if self.check_port(port):
+            self.kill_port_process(port)
             time.sleep(1)
         
         try:
             proc = subprocess.Popen(
-                [sys.executable, '-m', 'uvicorn', 'indextts_api:app', '--host', '0.0.0.0', '--port', '9966'],
-                cwd=os.getcwd(),
+                [sys.executable, '-m', 'modules.tts.tts_worker'],
+                cwd=str(project_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
-            self.processes['ChatTTS'] = proc
+            self.processes['TTS'] = proc
             return True
         except Exception as e:
-            print(f"启动 IndexTTS2 失败: {e}")
+            print(f"启动 TTS 失败: {e}")
             return False
     
-    def start_sensevoice(self):
-        """启动 SenseVoice 服务"""
-        if 'SenseVoice' in self.processes:
-            proc = self.processes['SenseVoice']
+    def start_asr(self):
+        """启动 ASR 服务"""
+        if 'ASR' in self.processes:
+            proc = self.processes['ASR']
             if proc.poll() is None:
-                self.stop_service('SenseVoice')
+                self.stop_service('ASR')
                 time.sleep(1)
         
-        if self.check_port(self.ports['SenseVoice']):
-            self.kill_port_process(self.ports['SenseVoice'])
+        port = self.ports['ASR']
+        if self.check_port(port):
+            self.kill_port_process(port)
             time.sleep(1)
         
-        sensevoice_path = Path('SenseVoice/api.py')
-        if not sensevoice_path.exists():
-            return False
-        
         try:
-            if sys.platform == 'win32':
-                proc = subprocess.Popen(
-                    [sys.executable, 'api.py'],
-                    cwd=str(sensevoice_path.parent),
-                    stdout=None,
-                    stderr=subprocess.STDOUT,
-                    creationflags=0
-                )
-            else:
-                proc = subprocess.Popen(
-                    [sys.executable, 'api.py'],
-                    cwd=str(sensevoice_path.parent),
-                    stdout=None,
-                    stderr=subprocess.STDOUT
-                )
-            self.processes['SenseVoice'] = proc
+            proc = subprocess.Popen(
+                [sys.executable, '-m', 'modules.asr.asr_worker'],
+                cwd=str(project_root),
+                stdout=None,
+                stderr=subprocess.STDOUT,
+                creationflags=0 if sys.platform == 'win32' else 0
+            )
+            self.processes['ASR'] = proc
             return True
         except Exception as e:
-            print(f"启动 SenseVoice 失败: {e}")
+            print(f"启动 ASR 失败: {e}")
             return False
     
     def start_frontend(self):
@@ -129,14 +139,16 @@ class ServiceManager:
                 self.stop_service('Frontend')
                 time.sleep(1)
         
-        if self.check_port(self.ports['Frontend']):
-            self.kill_port_process(self.ports['Frontend'])
+        port = self.ports['Frontend']
+        if self.check_port(port):
+            self.kill_port_process(port)
             time.sleep(1)
         
         try:
+            html_file = webui_config.get('html_file', 'index.html')
             proc = subprocess.Popen(
-                [sys.executable, '-m', 'http.server', '8000'],
-                cwd=os.getcwd(),
+                [sys.executable, '-m', 'http.server', str(port)],
+                cwd=str(project_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
@@ -155,7 +167,8 @@ class ServiceManager:
                 self.stop_service('Ollama')
                 time.sleep(1)
         
-        if self.check_port(self.ports['Ollama']):
+        port = self.ports['Ollama']
+        if self.check_port(port):
             return True
         
         try:
@@ -228,7 +241,7 @@ class ServiceManager:
 app = FastAPI(title="AI-EVA 服务管理器")
 service_manager = ServiceManager()
 
-# HTML 界面
+# HTML 界面模板（简化版，实际应该从文件读取）
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -237,13 +250,9 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-EVA 服务管理器</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Microsoft YaHei UI', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Microsoft YaHei UI', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -256,22 +265,11 @@ HTML_TEMPLATE = """
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             overflow: hidden;
         }
-        .banner {
-            background: #fbbf24;
-            color: #92400e;
-            padding: 15px;
-            text-align: center;
-            font-size: 14px;
-        }
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
-        }
-        .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
         }
         .controls {
             padding: 30px;
@@ -292,27 +290,12 @@ HTML_TEMPLATE = """
             color: white;
             min-width: 120px;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .btn:active {
-            transform: translateY(0);
-        }
         .btn-start { background: #48bb78; }
         .btn-stop { background: #f56565; }
         .btn-refresh { background: #4299e1; }
         .btn-browser { background: #9f7aea; }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
         .services {
             padding: 30px;
-        }
-        .services h2 {
-            margin-bottom: 20px;
-            color: #2d3748;
         }
         .service-table {
             width: 100%;
@@ -322,70 +305,21 @@ HTML_TEMPLATE = """
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        .service-table th, .service-table td {
+            padding: 15px;
+            text-align: left;
+        }
         .service-table thead {
             background: #e2e8f0;
         }
-        .service-table th {
-            padding: 15px;
-            text-align: left;
-            font-weight: bold;
-            color: #2d3748;
-        }
-        .service-table td {
-            padding: 15px;
-            border-top: 1px solid #e2e8f0;
-        }
-        .service-table tr:hover {
-            background: #f7fafc;
-        }
-        .status-running {
-            color: #48bb78;
-            font-weight: bold;
-        }
-        .status-stopped {
-            color: #f56565;
-            font-weight: bold;
-        }
-        .log-area {
-            padding: 30px;
-            background: #1a202c;
-            color: #e2e8f0;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-            max-height: 300px;
-            overflow-y: auto;
-            border-radius: 8px;
-        }
-        .log-entry {
-            padding: 5px 0;
-            border-bottom: 1px solid #2d3748;
-        }
-        .log-time {
-            color: #718096;
-        }
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .status-running { color: #48bb78; font-weight: bold; }
+        .status-stopped { color: #f56565; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="banner">
-            ⚠️ Demo阶段：程序运行可能会不稳定，如有异常可即刻向我们反馈
-        </div>
         <div class="header">
-            <h1>AI-EVA Demo 服务管理器</h1>
-            <p>基于 Web 的服务管理界面</p>
+            <h1>AI-EVA 服务管理器</h1>
         </div>
         <div class="controls">
             <button class="btn btn-start" onclick="startAll()">🚀 一键启动</button>
@@ -409,31 +343,16 @@ HTML_TEMPLATE = """
                 </tbody>
             </table>
         </div>
-        <div class="log-area" id="log-area">
-            <div class="log-entry"><span class="log-time">[系统]</span> AI-EVA Demo 服务管理器已就绪</div>
-        </div>
     </div>
 
     <script>
-        let statusInterval;
-        
-        function addLog(message) {
-            const logArea = document.getElementById('log-area');
-            const time = new Date().toLocaleTimeString();
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
-            logArea.appendChild(entry);
-            logArea.scrollTop = logArea.scrollHeight;
-        }
-        
         async function refreshStatus() {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
                 updateServicesTable(data.status);
             } catch (error) {
-                addLog('刷新状态失败: ' + error.message);
+                console.error('刷新状态失败:', error);
             }
         }
         
@@ -442,9 +361,9 @@ HTML_TEMPLATE = """
             tbody.innerHTML = '';
             
             const ports = {
-                'IndexTTS2': 9966,
-                'SenseVoice': 50000,
-                'Frontend': 8000,
+                'TTS': """ + str(tts_config.get('port', 9966)) + """,
+                'ASR': """ + str(asr_config.get('port', 50000)) + """,
+                'Frontend': """ + str(webui_config.get('port', 8000)) + """,
                 'Ollama': 11434
             };
             
@@ -470,80 +389,61 @@ HTML_TEMPLATE = """
         }
         
         async function startAll() {
-            addLog('开始启动所有服务...');
             try {
                 const response = await fetch('/api/start-all', { method: 'POST' });
                 const data = await response.json();
                 if (data.success) {
-                    addLog('所有服务启动完成！');
                     setTimeout(refreshStatus, 2000);
-                } else {
-                    addLog('启动失败: ' + (data.message || '未知错误'));
                 }
             } catch (error) {
-                addLog('启动失败: ' + error.message);
+                console.error('启动失败:', error);
             }
         }
         
         async function stopAll() {
             if (!confirm('确定要停止所有服务吗？')) return;
-            addLog('开始停止所有服务...');
             try {
                 const response = await fetch('/api/stop-all', { method: 'POST' });
                 const data = await response.json();
                 if (data.success) {
-                    addLog('所有服务已停止');
                     refreshStatus();
-                } else {
-                    addLog('停止失败: ' + (data.message || '未知错误'));
                 }
             } catch (error) {
-                addLog('停止失败: ' + error.message);
+                console.error('停止失败:', error);
             }
         }
         
         async function startService(name) {
-            addLog(`开始启动 ${name} 服务...`);
             try {
                 const response = await fetch(`/api/start/${name}`, { method: 'POST' });
                 const data = await response.json();
                 if (data.success) {
-                    addLog(`${name} 服务启动成功`);
                     setTimeout(refreshStatus, 2000);
-                } else {
-                    addLog(`${name} 服务启动失败: ` + (data.message || '未知错误'));
                 }
             } catch (error) {
-                addLog(`启动 ${name} 失败: ` + error.message);
+                console.error('启动失败:', error);
             }
         }
         
         async function stopService(name) {
             if (!confirm(`确定要停止 ${name} 服务吗？`)) return;
-            addLog(`开始停止 ${name} 服务...`);
             try {
                 const response = await fetch(`/api/stop/${name}`, { method: 'POST' });
                 const data = await response.json();
                 if (data.success) {
-                    addLog(`${name} 服务已停止`);
                     refreshStatus();
-                } else {
-                    addLog(`${name} 服务停止失败: ` + (data.message || '未知错误'));
                 }
             } catch (error) {
-                addLog(`停止 ${name} 失败: ` + error.message);
+                console.error('停止失败:', error);
             }
         }
         
         function openBrowser() {
-            window.open('http://localhost:8000', '_blank');
-            addLog('已打开浏览器');
+            window.open('http://localhost:' + """ + str(webui_config.get('port', 8000)) + """, '_blank');
         }
         
-        // 页面加载时刷新状态
         refreshStatus();
-        // 每5秒自动刷新状态
-        statusInterval = setInterval(refreshStatus, 5000);
+        setInterval(refreshStatus, 5000);
     </script>
 </body>
 </html>
@@ -561,12 +461,11 @@ async def get_status():
 @app.post("/api/start-all")
 async def start_all():
     try:
-        # 异步启动服务
         def start_services():
             results = {}
             services = [
-                ('IndexTTS2', service_manager.start_chattts),
-                ('SenseVoice', service_manager.start_sensevoice),
+                ('TTS', service_manager.start_tts),
+                ('ASR', service_manager.start_asr),
                 ('Frontend', service_manager.start_frontend),
                 ('Ollama', service_manager.start_ollama)
             ]
@@ -592,10 +491,10 @@ async def stop_all():
 async def start_service(service_name: str):
     try:
         success = False
-        if service_name == 'IndexTTS2':
-            success = service_manager.start_chattts()
-        elif service_name == 'SenseVoice':
-            success = service_manager.start_sensevoice()
+        if service_name == 'TTS':
+            success = service_manager.start_tts()
+        elif service_name == 'ASR':
+            success = service_manager.start_asr()
         elif service_name == 'Frontend':
             success = service_manager.start_frontend()
         elif service_name == 'Ollama':
@@ -617,7 +516,6 @@ async def stop_service(service_name: str):
 
 def main():
     """主函数"""
-    # 检查 psutil 是否安装
     try:
         import psutil
     except ImportError:
@@ -625,23 +523,24 @@ def main():
         subprocess.run([sys.executable, '-m', 'pip', 'install', 'psutil', '--quiet'])
         import psutil
     
-    # 延迟打开浏览器
     def open_browser():
         time.sleep(2)
-        webbrowser.open('http://localhost:9000')
+        manager_port = webui_config.get('manager_port', 9000)
+        webbrowser.open(f'http://localhost:{manager_port}')
     
     threading.Thread(target=open_browser, daemon=True).start()
     
+    manager_port = webui_config.get('manager_port', 9000)
     print("=" * 50)
-    print("AI-EVA Demo Web 启动器")
+    print("AI-EVA 服务管理器")
     print("=" * 50)
-    print("服务管理界面: http://localhost:9000")
-    print("前端界面: http://localhost:8000")
+    print(f"服务管理界面: http://localhost:{manager_port}")
+    print(f"前端界面: http://localhost:{webui_config.get('port', 8000)}")
     print("=" * 50)
     print("按 Ctrl+C 停止服务")
     print("=" * 50)
     
-    uvicorn.run(app, host="127.0.0.1", port=9000, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=manager_port, log_level="info")
 
 if __name__ == '__main__':
     main()

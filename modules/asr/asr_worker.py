@@ -1,41 +1,111 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
-SenseVoice API 简化版 - 专为 AI-EVA Demo 优化
-支持浏览器音频流上传和实时语音识别
+ASR 模块 - SenseVoice 语音识别工作器
+负责语音转文字功能
 """
 import os
+import sys
 import asyncio
 import logging
+from pathlib import Path
 from typing import Optional, List
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 import torch
 import torchaudio
 import numpy as np
 from io import BytesIO
-import tempfile
-from pathlib import Path
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import uvicorn
+import yaml
+
+# 修复 Windows 控制台编码问题
+if sys.platform == 'win32':
+    import io
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except AttributeError:
+        # 如果已经是 TextIOWrapper，跳过
+        pass
+
+# 添加项目根目录到路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# 添加 SenseVoice 目录到路径（确保能正确导入 utils）
+sensevoice_dir = project_root / "SenseVoice"
+if sensevoice_dir.exists():
+    sys.path.insert(0, str(sensevoice_dir))
 
 # 导入 SenseVoice 相关模块
 try:
-    from SenseVoice.model import SenseVoiceSmall
+    # 保存原始工作目录
+    original_cwd = os.getcwd()
+    
+    # 临时切换到 SenseVoice 目录以便正确导入 utils
+    if sensevoice_dir.exists():
+        os.chdir(str(sensevoice_dir))
+    
+    # 导入模块
+    from model import SenseVoiceSmall
     from funasr.utils.postprocess_utils import rich_transcription_postprocess
+    
+    # 恢复工作目录
+    os.chdir(original_cwd)
+    
     SENSEVOICE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     SENSEVOICE_AVAILABLE = False
-    print("⚠️  SenseVoice 模块未找到，语音识别功能将不可用")
+    # 恢复工作目录
+    try:
+        os.chdir(original_cwd)
+    except:
+        pass
+    import logging
+    logging.basicConfig(level=logging.WARNING)
+    logger = logging.getLogger("asr_worker")
+    logger.warning(f"SenseVoice 模块未找到，语音识别功能将不可用: {e}")
+except Exception as e:
+    SENSEVOICE_AVAILABLE = False
+    # 恢复工作目录
+    try:
+        os.chdir(original_cwd)
+    except:
+        pass
+    import logging
+    logging.basicConfig(level=logging.ERROR)
+    logger = logging.getLogger("asr_worker")
+    logger.error(f"导入 SenseVoice 模块时出错: {e}")
 
-from config import config
-from utils.logger import get_logger
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
+)
+logger = logging.getLogger("asr_worker")
 
-# 初始化日志
-logger = get_logger("sensevoice")
+# 加载配置
+def load_config():
+    """加载配置文件"""
+    config_path = project_root / "config.yaml"
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    return {}
+
+config = load_config()
+asr_config = config.get('modules', {}).get('asr', {})
+
+# 目标采样率
+TARGET_FS = asr_config.get('target_sample_rate', 16000)
 
 # 创建 FastAPI 应用
 app = FastAPI(
-    title="SenseVoice API",
-    description="AI-EVA Demo 语音识别服务",
-    version="1.0.0"
+    title="SenseVoice ASR API",
+    description="AI-EVA 语音识别服务",
+    version="2.0.0"
 )
 
 # 添加 CORS 支持
@@ -51,11 +121,8 @@ app.add_middleware(
 model = None
 device = None
 
-# 目标采样率
-TARGET_FS = 16000
-
-class SenseVoiceAPI:
-    """SenseVoice API 管理器"""
+class SenseVoiceWorker:
+    """SenseVoice 工作器"""
     
     def __init__(self):
         self.model = None
@@ -70,25 +137,32 @@ class SenseVoiceAPI:
                 detail="SenseVoice 模块未安装，请检查依赖"
             )
         
+        if self.is_loaded:
+            logger.debug("✅ 模型已加载，跳过")
+            return
+        
         try:
-            logger.info("正在加载 SenseVoice 模型...")
+            logger.info("🔄 正在加载 SenseVoice 模型...")
+            
+            # 获取设备配置
+            device_config = asr_config.get('device', 'cuda:0')
+            use_gpu = config.get('performance', {}).get('use_gpu', True)
             
             # 自动检测可用设备
-            import torch
-            if config.USE_GPU and torch.cuda.is_available():
-                self.device = config.SENSEVOICE_DEVICE
+            if use_gpu and torch.cuda.is_available():
+                self.device = device_config
                 logger.info(f"✅ 使用 GPU 设备: {self.device}")
             else:
                 self.device = "cpu"
-                if config.USE_GPU and not torch.cuda.is_available():
+                if use_gpu and not torch.cuda.is_available():
                     logger.warning("⚠️  CUDA 不可用，降级到 CPU")
                 else:
-                    logger.info(f"使用 CPU 设备")
+                    logger.info("使用 CPU 设备")
             
             # 加载模型
-            model_dir = "iic/SenseVoiceSmall"
+            model_path = asr_config.get('model_path', 'iic/SenseVoiceSmall')
             self.model, kwargs = SenseVoiceSmall.from_pretrained(
-                model=model_dir, 
+                model=model_path, 
                 device=self.device
             )
             self.model.eval()
@@ -98,6 +172,8 @@ class SenseVoiceAPI:
             
         except Exception as e:
             logger.error(f"❌ 模型加载失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             raise HTTPException(
                 status_code=500,
                 detail=f"模型加载失败: {str(e)}"
@@ -148,23 +224,25 @@ class SenseVoiceAPI:
                 
         except Exception as e:
             logger.error(f"转录失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             raise HTTPException(
                 status_code=500,
                 detail=f"语音识别失败: {str(e)}"
             )
 
-# 创建 API 实例
-sensevoice_api = SenseVoiceAPI()
+# 创建工作器实例
+worker = SenseVoiceWorker()
 
 @app.on_event("startup")
 async def startup_event():
     """应用启动时初始化"""
-    logger.info("🚀 SenseVoice API 启动中...")
+    logger.info("🚀 SenseVoice ASR 服务启动中...")
     
-    # 预加载模型（可选）
-    if config.USE_GPU:
+    # 预加载模型（如果启用）
+    if config.get('performance', {}).get('use_gpu', True):
         try:
-            await sensevoice_api.load_model()
+            await worker.load_model()
             logger.info("✅ 模型预加载完成")
         except Exception as e:
             logger.warning(f"模型预加载失败，将在首次请求时加载: {e}")
@@ -173,11 +251,11 @@ async def startup_event():
 async def root():
     """根路径 - 服务状态"""
     return {
-        "service": "SenseVoice API",
-        "version": "1.0.0",
+        "service": "SenseVoice ASR API",
+        "version": "2.0.0",
         "status": "running",
-        "model_loaded": sensevoice_api.is_loaded,
-        "device": sensevoice_api.device if sensevoice_api.device else "unknown"
+        "model_loaded": worker.is_loaded,
+        "device": worker.device if worker.device else "unknown"
     }
 
 @app.get("/health")
@@ -186,7 +264,7 @@ async def health_check():
     return {
         "status": "healthy",
         "model_available": SENSEVOICE_AVAILABLE,
-        "model_loaded": sensevoice_api.is_loaded
+        "model_loaded": worker.is_loaded
     }
 
 @app.post("/api/v1/asr")
@@ -223,7 +301,7 @@ async def speech_to_text(
         logger.info(f"收到音频文件: {file.filename}, 大小: {len(audio_data)} bytes")
         
         # 转录音频
-        text = await sensevoice_api.transcribe_audio(audio_data, language)
+        text = await worker.transcribe_audio(audio_data, language)
         
         logger.info(f"识别结果: {text}")
         
@@ -238,6 +316,8 @@ async def speech_to_text(
         raise
     except Exception as e:
         logger.error(f"API 错误: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"处理失败: {str(e)}"
@@ -250,13 +330,6 @@ async def batch_speech_to_text(
 ):
     """
     批量语音转文字 API
-    
-    Args:
-        files: 音频文件列表
-        language: 语言代码
-        
-    Returns:
-        批量识别结果
     """
     try:
         results = []
@@ -264,7 +337,7 @@ async def batch_speech_to_text(
         for i, file in enumerate(files):
             try:
                 audio_data = await file.read()
-                text = await sensevoice_api.transcribe_audio(audio_data, language)
+                text = await worker.transcribe_audio(audio_data, language)
                 
                 results.append({
                     "index": i,
@@ -300,21 +373,27 @@ async def get_models():
     """获取可用模型信息"""
     return {
         "available": SENSEVOICE_AVAILABLE,
-        "loaded": sensevoice_api.is_loaded,
-        "device": sensevoice_api.device,
+        "loaded": worker.is_loaded,
+        "device": worker.device,
         "supported_languages": ["auto", "zh", "en", "yue", "ja", "ko"],
         "supported_formats": ["wav", "mp3", "m4a", "flac"]
     }
 
-if __name__ == "__main__":
-    import uvicorn
+def main():
+    """主函数"""
+    host = asr_config.get('host', '127.0.0.1')
+    port = asr_config.get('port', 50000)
     
-    logger.info(f"启动 SenseVoice API 服务...")
-    logger.info(f"服务地址: http://{config.SENSEVOICE_HOST}:{config.SENSEVOICE_PORT}")
+    logger.info(f"启动 SenseVoice ASR 服务...")
+    logger.info(f"服务地址: http://{host}:{port}")
     
     uvicorn.run(
         app,
-        host=config.SENSEVOICE_HOST,
-        port=config.SENSEVOICE_PORT,
-        log_level=config.LOG_LEVEL.lower()
+        host=host,
+        port=port,
+        log_level="info"
     )
+
+if __name__ == "__main__":
+    main()
+

@@ -1,171 +1,181 @@
-# ========== AI-EVA Demo 项目特定规则 ==========
+# ========================================
+# AI-EVA 项目 .gitignore
+# ========================================
 
-# 环境配置文件
-.env
-.env.local
-.env.production
-.env.development
-
-# 日志文件
-logs/
-*.log
-ai-eva.log
-
-# 缓存目录
-cache/
-cache/audio/
-.cache/
+# ========== Python 编译文件 ==========
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# 临时文件
-temp/
-tmp/
-*.tmp
-*.temp
+# ========== 虚拟环境 ==========
+venv/
+env/
+ENV/
+.venv
+index-tts/.venv/
 
-# 用户上传的模型文件
-uploads/
-user_models/
-models/
-*.vrm
-*.glb
-*.gltf
+# ========== 便携式 Python 环境 ==========
+python-portable/
 
-# 生成的音频文件
-generated_audio/
-*.mp3
-*.wav
-*.m4a
-*.flac
-
-# 截图和导出文件
-screenshots/
-exports/
-*.png
-*.jpeg
-*.gif
-
-# 对话记录导出
-conversations/
-ai-eva-conversation-*
-
-# 性能监控数据
-performance/
-stats/
-*.csv
-
-# 开发工具配置
+# ========== IDE 配置 ==========
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
-# 操作系统文件
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# ========== 日志文件 ==========
+logs/*.log
+*.log
+*.log.*
 
-# 模型权重文件（通常很大）
-*.pth
-*.pt
-*.ckpt
-*.safetensors
-*.bin
-*.h5
-*.pkl
-*.joblib
-
-# 预训练模型目录
-pretrained/
-checkpoints/
-weights/
-asset/
-
-# 数据集文件
-datasets/
-*.csv
-*.tsv
-*.parquet
-
-# Jupyter Notebook 检查点
-.ipynb_checkpoints/
-
-# 测试覆盖率报告
-htmlcov/
-.coverage
-coverage.xml
-
-# 文档构建
-docs/_build/
-site/
-
-# 备份文件
-*.bak
-*.backup
-*.old
-
-# 压缩文件
-*.zip
-*.tar.gz
-*.rar
-*.7z
-
-# 数据库文件
-*.db
-*.sqlite
-*.sqlite3
-
-# 配置文件备份
-config.backup
-settings.backup
-
-# 用户数据
-user_data/
-profiles/
-sessions/
-
-# 错误报告
-error_reports/
-crash_dumps/
-
-# 性能分析文件
-*.prof
-*.profile
-
-# 内存转储
-*.dmp
-*.core
-
-# 锁文件
-*.lock
-.lock
-
-# 进程ID文件
-*.pid
-
-# 套接字文件
-*.sock
-
-# 临时目录
-/tmp/
-/temp/
-
-# 系统临时文件
+# ========== 临时文件 ==========
+temp/
 *.tmp
 *.temp
+*.bak
+*.backup
 
-# 编辑器临时文件
-*~
-.#*
-\#*#
-.#*
+# ========== 缓存文件 ==========
+cache/
+*.cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# 项目特定的大文件
-large_files/
-big_data/
-python-portable/
+# ========== 子模块内容（子模块会单独管理）==========
+# IndexTTS2 和 SenseVoice 作为子模块，其内容由子模块管理
+# 但我们需要忽略子模块中的大文件和生成文件
+
+# IndexTTS2 子模块中的模型和输出文件
+index-tts/checkpoints/*.pt
+index-tts/checkpoints/*.pth
+index-tts/checkpoints/*.pkl
+index-tts/checkpoints/*.bin
+index-tts/checkpoints/*.safetensors
+index-tts/checkpoints/*.model
+index-tts/checkpoints/*.vocab
+index-tts/checkpoints/*.stats
+index-tts/checkpoints/qwen*/
+index-tts/outputs/
+index-tts/.venv/
+
+# SenseVoice 子模块中的模型文件
+SenseVoice/**/*.pt
+SenseVoice/**/*.pth
+SenseVoice/**/*.pkl
+SenseVoice/**/*.bin
+SenseVoice/__pycache__/
+
+# ========== 项目模型文件（大文件，使用 Git LFS 或单独管理）==========
+models/*.pt
+models/*.pth
+models/*.pkl
+models/*.bin
+models/*.safetensors
+models/*.onnx
+models/*.vrm
+
+models/sense_voice/*.pt
+models/sense_voice/*.pth
+
+# ========== 输出文件 ==========
+index-tts/outputs/
+test_output.mp3
+*.wav
+
+# ========== 配置文件（包含敏感信息）==========
+.env
+.env.local
+.env.*.local
+config.local.yaml
+*.secret
+secrets/
+
+# ========== 操作系统文件 ==========
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# ========== 构建和分发 ==========
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ========== 测试相关 ==========
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+.pytest_cache/
+test-results/
+coverage.xml
+*.cover
+
+# ========== Node.js (AI-EVA-Launcher) ==========
+AI-EVA-Launcher/node_modules/
+AI-EVA-Launcher/dist/
+AI-EVA-Launcher/.vite/
+*.log
+
+# ========== Rust (AI-EVA-Launcher) ==========
+AI-EVA-Launcher/src-tauri/target/
+AI-EVA-Launcher/src-tauri/Cargo.lock
+
+# ========== 其他 ==========
+*.orig
+*.rej
+*.swo
+*.swp
+.vscode-test/
+.history/
+
+# ========== 需要提交的文件（明确不忽略）==========
+!config.yaml
+!*.yaml.example
+!*.yml.example
+
+# 源代码
+!*.py
+!*.html
+!*.js
+!*.css
+!*.md
+
+# 依赖文件
+!requirements.txt
+!requirements*.txt
+!**/requirements.txt
+
+# 启动脚本
+!*.bat
+!*.sh
+!*.ps1
+
+# 文档
+!README.md
+!ARCHITECTURE.md
+!*.md
+
+# 项目结构文件
+!.gitignore
+!.gitattributes
