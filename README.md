@@ -1,4 +1,4 @@
-# AI-EVA Demo
+# AI-EVA
 
 <div align="center">
 
@@ -10,7 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-Demo-orange.svg)](LICENSE)
 
-[快速开始](#-快速开始) • [功能特性](#-功能特性) • [使用指南](#-使用指南) • [配置说明](#-配置说明) • [常见问题](#-常见问题)
+[快速开始](#-快速开始) • [功能特性](#-功能特性) • [架构说明](#-架构说明) • [配置指南](#-配置指南) • [常见问题](#-常见问题)
 
 </div>
 
@@ -19,6 +19,12 @@
 ## 📖 项目简介
 
 AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** 的 3D 虚拟角色交互系统。通过整合 IndexTTS2、Ollama、SenseVoice 等开源技术，实现了完整的多模态对话体验。
+
+**核心特点：**
+- 🏗️ **模块化架构**：代码与模型分离，功能模块解耦，易于维护和扩展
+- 🚀 **统一启动器**：一键启动所有服务，自动管理模块生命周期
+- ⚙️ **集中配置**：所有配置集中在 `config.yaml`，简单易用
+- 📦 **子模块管理**：使用 Git 子模块管理第三方依赖，保持代码同步
 
 **适用场景：** 作为付费项目的免费 Demo 展示，演示 AI 虚拟角色的核心交互能力。
 
@@ -31,6 +37,7 @@ AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** �
 | 🎵 语音合成 | IndexTTS2 | 高质量 TTS 引擎，支持语音克隆 |
 | 🎤 语音识别 | SenseVoice | 高精度 ASR 服务 |
 | ⚡ 后端框架 | FastAPI | 异步 Web 服务 |
+| 🔧 启动器 | Python Subprocess | 统一服务管理 |
 
 ---
 
@@ -99,46 +106,101 @@ AI-EVA 是一个集成了 **语音合成**、**AI 对话**、**语音识别** �
 ⚠️ Ollama 已安装并运行
 ```
 
-### ⚡ 一键启动（推荐）
+### ⚡ 一键安装与启动
+
+#### 1️⃣ 克隆项目（包含子模块）
 
 ```bash
-# 1️⃣ 克隆项目
-git clone <your-repo-url>
+# 克隆项目（包含子模块）
+git clone --recursive <your-repo-url>
 cd AI-EVA
 
-# 2️⃣ 安装依赖
-pip install -r requirements.txt
-
-# 💡 如需 GPU 加速（可选）
-# pip uninstall torch torchaudio
-# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
-# pip install -r requirements-gpu.txt
-
-# 3️⃣ 一键启动
-start-all.bat  # Windows
-# ./start-all.sh  # Linux/Mac
-
-# 4️⃣ 访问界面
-# 打开浏览器访问: http://localhost:8000
+# 如果已经克隆了项目，初始化子模块
+git submodule update --init --recursive
 ```
 
-### 🔧 手动启动（可选）
-
-如果需要分别启动各个服务：
+#### 2️⃣ 安装依赖
 
 ```bash
-# 终端 1 - IndexTTS2 服务（必需）
-uvicorn indextts_api:app --host 0.0.0.0 --port 9966
+# 使用一键安装脚本（推荐，自动处理依赖冲突，使用清华源）
+python install_deps.py
 
-# 终端 2 - SenseVoice 服务（可选）
-cd SenseVoice && python api.py
+# 或手动安装
+pip install -r requirements.txt
+pip install -r modules/asr/requirements.txt
+pip install -r modules/tts/requirements.txt
+pip install -r modules/llm/requirements.txt
+pip install -r modules/webui/requirements.txt
+```
 
-# 终端 3 - Ollama 服务（必需）
+#### 3️⃣ 下载模型文件
+
+```bash
+# IndexTTS2 模型（必需）
+cd index-tts
+modelscope download --model IndexTeam/IndexTTS-2 --local_dir checkpoints
+cd ..
+
+# SenseVoice 模型会在首次使用时自动下载
+```
+
+#### 4️⃣ 配置 Ollama
+
+确保 Ollama 已安装并运行：
+
+```bash
+# 安装 Ollama（如果未安装）
+# Windows: 下载 https://ollama.com/download
+# Linux/Mac: curl https://ollama.ai/install.sh | sh
+
+# 启动 Ollama 服务
 ollama serve
 
-# 终端 4 - 前端服务（必需）
-python -m http.server 8000
+# 下载模型（在另一个终端）
+ollama pull qwen2.5:7b
+# 或使用更小的模型
+ollama pull qwen2.5:3b
 ```
+
+#### 5️⃣ 配置项目
+
+编辑 `config.yaml` 文件，配置各模块参数：
+
+```yaml
+modules:
+  llm:
+    model_name: "qwen2.5:7b"  # 修改为你下载的模型
+  
+  tts:
+    ref_audio: "./voices/user_ref.wav"  # 设置参考音频路径（可选）
+```
+
+#### 6️⃣ 启动服务
+
+**方式一：使用启动器（推荐）**
+
+```bash
+python launcher.py
+```
+
+**方式二：使用批处理脚本（Windows）**
+
+```bash
+bin\start_windows.bat
+```
+
+**方式三：使用 Shell 脚本（Linux/Mac）**
+
+```bash
+bash bin/start_linux.sh
+```
+
+#### 7️⃣ 访问界面
+
+- **前端界面**: http://localhost:8000
+- **服务管理器**: http://localhost:9000
+- **TTS API**: http://localhost:9966
+- **ASR API**: http://localhost:50000
 
 ### 📡 服务端口
 
@@ -148,6 +210,68 @@ python -m http.server 8000
 | 🎵 IndexTTS2 | 9966 | http://localhost:9966/ | ✅ 必需 |
 | 🧠 Ollama | 11434 | http://localhost:11434/api/tags | ✅ 必需 |
 | 🎤 SenseVoice | 50000 | http://localhost:50000/ | ⚠️ 可选 |
+| 🔧 服务管理器 | 9000 | http://localhost:9000 | ✅ 必需 |
+
+---
+
+## 🏗️ 架构说明
+
+### 目录结构
+
+```
+AI-EVA/
+├── launcher.py              # 🚀 统一启动器（核心）
+├── config.yaml              # ⚙️ 全局配置文件
+├── install_deps.py          # 📦 依赖安装脚本
+├── requirements.txt        # 📋 基础依赖
+│
+├── bin/                     # 🔧 启动脚本
+│   ├── start_windows.bat
+│   └── start_linux.sh
+│
+├── modules/                 # 📦 功能模块
+│   ├── asr/                 # 🎤 语音识别（SenseVoice）
+│   │   ├── asr_worker.py
+│   │   └── requirements.txt
+│   ├── tts/                 # 🎵 语音合成（IndexTTS2）
+│   │   ├── tts_worker.py
+│   │   └── requirements.txt
+│   ├── llm/                 # 🧠 大语言模型（Ollama）
+│   │   ├── ollama_client.py
+│   │   └── requirements.txt
+│   └── webui/               # 🌐 Web 界面
+│       ├── app.py
+│       └── requirements.txt
+│
+├── models/                  # 💾 模型文件目录
+│   ├── sense_voice/
+│   └── index_tts/
+│
+├── voices/                  # 🎤 TTS 参考音频
+├── temp/                    # 📁 临时文件
+├── logs/                    # 📝 日志文件
+│
+├── index-tts/              # 📦 IndexTTS2 子模块
+└── SenseVoice/             # 📦 SenseVoice 子模块
+```
+
+### 核心设计理念
+
+1. **模块化分离**
+   - 代码与模型分离：模型文件存放在 `models/` 目录
+   - 功能模块解耦：每个模块独立运行，通过 HTTP API 通信
+   - 统一配置管理：所有配置集中在 `config.yaml`
+
+2. **数据流转**
+   - 临时文件：`temp/` 目录用于存放处理过程中的临时文件
+   - 日志文件：`logs/` 目录集中管理所有日志
+   - 模型文件：`models/` 目录统一存放模型权重
+
+3. **启动方式**
+   - 统一启动器：`launcher.py` 负责启动和管理所有模块
+   - 独立启动：每个模块也可以独立运行（用于调试）
+
+详细架构说明请查看 [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
@@ -157,7 +281,7 @@ python -m http.server 8000
 
 1. **启动服务**
    ```bash
-   start-all.bat
+   python launcher.py
    ```
 
 2. **上传 VRM 模型**
@@ -165,7 +289,7 @@ python -m http.server 8000
    - 或点击设置 ⚙️ → 上传模型
 
 3. **配置 AI 模型**
-   - 设置 → Ollama 模型选择（如 `gemma2:2b`）
+   - 设置 → Ollama 模型选择（如 `qwen2.5:7b`）
    - 设置 → IndexTTS2 音色选择（支持音频文件路径或默认音色）
 
 4. **开始对话**
@@ -230,31 +354,40 @@ python -m http.server 8000
 
 ---
 
-## 🔧 配置说明
+## 🔧 配置指南
 
-### 📝 环境变量
+### config.yaml 配置说明
 
-创建 `.env` 文件（复制 `.env.example`）：
+主要配置项：
 
-```bash
-# ========== 服务端口 ==========
-TTS_PORT=9966
-SENSEVOICE_PORT=50000
-OLLAMA_PORT=11434
+```yaml
+system:
+  temp_dir: "./temp"      # 临时文件目录
+  log_dir: "./logs"       # 日志目录
 
-# ========== AI 模型 ==========
-DEFAULT_OLLAMA_MODEL=gemma2:2b
-DEFAULT_VOICE=1031.pt
-
-# ========== 性能配置 ==========
-USE_GPU=true                     # 自动降级到 CPU
-MAX_CONCURRENT_REQUESTS=5        # 最大并发请求数
-AUDIO_CACHE_SIZE=100             # 音频缓存大小（MB）
-
-# ========== 日志配置 ==========
-LOG_LEVEL=INFO
-LOG_FILE=ai-eva.log
+modules:
+  asr:
+    enabled: true         # 是否启用 ASR
+    device: "cuda:0"      # 设备：cuda:0, cpu
+    port: 50000           # API 端口
+    
+  tts:
+    enabled: true         # 是否启用 TTS
+    port: 9966            # API 端口
+    preload_model: false  # 启动时预加载模型（true=启动加载，false=延迟加载）
+    ref_audio: "./voices/user_ref.wav"  # 参考音频路径
+    
+  llm:
+    base_url: "http://localhost:11434"  # Ollama API 地址
+    model_name: "qwen2.5:7b"            # 模型名称
+    
+  webui:
+    enabled: true
+    port: 8000            # 前端端口
+    manager_port: 9000    # 服务管理器端口
 ```
+
+完整配置说明请查看 [config.yaml](config.yaml)
 
 ### 🎨 VRM 模型要求
 
@@ -272,41 +405,48 @@ LOG_FILE=ai-eva.log
 
 | 模型 | 大小 | 速度 | 质量 | 推荐场景 |
 |------|------|------|------|---------|
-| gemma2:2b | 1.6GB | ⚡⚡⚡ | ★★☆ | 快速测试 |
 | qwen2.5:3b | 2.0GB | ⚡⚡☆ | ★★★ | 平衡选择 |
-| llama3.2:3b | 2.0GB | ⚡⚡☆ | ★★★ | 英文对话 |
 | qwen2.5:7b | 4.7GB | ⚡☆☆ | ★★★★ | 高质量 |
+| gemma2:2b | 1.6GB | ⚡⚡⚡ | ★★☆ | 快速测试 |
+| llama3.2:3b | 2.0GB | ⚡⚡☆ | ★★★ | 英文对话 |
 
 ```bash
 # 下载模型
-ollama pull gemma2:2b
+ollama pull qwen2.5:7b
 ollama pull qwen2.5:3b
 ```
 
 ---
 
-## 📂 项目结构
+## 📦 子模块管理
 
+本项目使用 Git 子模块管理第三方依赖：
+
+- **IndexTTS2**: https://github.com/index-tts/index-tts
+- **SenseVoice**: https://github.com/FunAudioLLM/SenseVoice
+
+### 初始化子模块
+
+```bash
+# 克隆项目时包含子模块
+git clone --recursive <your-repo-url>
+
+# 或已克隆后初始化
+git submodule update --init --recursive
 ```
-AI-EVA/
-├── 📄 test0037.html              # 前端主界面
-├── 🐍 indextts_api.py             # IndexTTS2 API 服务
-├── 🐍 sensevoice_api.py          # SenseVoice API 适配器
-├── 🐍 config.py                  # 配置管理
-├── 📝 start-all.bat              # 一键启动脚本
-├── 📦 requirements.txt           # Python 依赖
-├── 📦 requirements-gpu.txt       # GPU 版本依赖
-├── 📋 .env.example               # 环境变量模板
-├── 📖 README.md                  # 项目文档
-├── 🔧 TROUBLESHOOTING.md         # 故障排除指南
-├── 🗂️ SenseVoice/                # SenseVoice 模块
-│   ├── api.py                   # SenseVoice API
-│   ├── model.py                 # 模型定义
-│   └── ...
-└── 🛠️ utils/                     # 工具模块
-    ├── logger.py                # 日志工具
-    └── audio_cache.py           # 音频缓存
+
+### 更新子模块
+
+```bash
+# 更新所有子模块
+git submodule update --remote
+
+# 更新特定子模块
+git submodule update --remote index-tts
+git submodule update --remote SenseVoice
 ```
+
+详细说明请查看 [SUBMODULES.md](SUBMODULES.md)
 
 ---
 
@@ -315,13 +455,30 @@ AI-EVA/
 ### 🐛 安装与启动
 
 <details>
+<summary><b>Q: 子模块克隆失败？</b></summary>
+
+```bash
+# 如果克隆时子模块失败，可以手动初始化
+git submodule update --init --recursive
+
+# 如果 IndexTTS2 的 LFS 文件下载失败（仓库 LFS 预算超限），可以跳过 LFS
+git config --global filter.lfs.smudge "git-lfs smudge --skip %f"
+git submodule update --init --recursive index-tts
+git config --global --unset filter.lfs.smudge
+```
+</details>
+
+<details>
 <summary><b>Q: pip 安装依赖失败？</b></summary>
 
 ```bash
-# 使用国内镜像加速
+# 使用一键安装脚本（自动使用清华源）
+python install_deps.py
+
+# 或手动使用国内镜像
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 或升级 pip
+# 升级 pip
 python -m pip install --upgrade pip
 ```
 </details>
@@ -347,8 +504,17 @@ netstat -ano | findstr :9966
 # 杀死进程
 taskkill /PID <进程ID> /F
 
-# 或修改 .env 中的端口配置
+# 或修改 config.yaml 中的端口配置
 ```
+</details>
+
+<details>
+<summary><b>Q: 模块启动失败？</b></summary>
+
+1. 检查端口是否被占用
+2. 检查依赖是否安装完整：`python install_deps.py`
+3. 查看 `logs/` 目录下的日志文件
+4. 检查 `config.yaml` 配置是否正确
 </details>
 
 ### 🎯 功能使用
@@ -373,9 +539,10 @@ taskkill /PID <进程ID> /F
 <details>
 <summary><b>Q: AI 回复速度慢？</b></summary>
 
-1. **使用小模型**：`gemma2:2b` 或 `qwen2.5:3b`
+1. **使用小模型**：`qwen2.5:3b` 或 `gemma2:2b`
 2. **启用 GPU**：安装 CUDA 版本 PyTorch
 3. **减少上下文长度**：设置中调整历史记录数
+4. **预加载模型**：在 `config.yaml` 中设置 `tts.preload_model: true`
 </details>
 
 ### 🚀 性能优化
@@ -389,19 +556,25 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
 **配置优化：**
-```bash
-# .env 文件
-USE_GPU=true
-AUDIO_CACHE_SIZE=200
-MAX_CONCURRENT_REQUESTS=10
+```yaml
+# config.yaml
+performance:
+  use_gpu: true
+  enable_audio_cache: true
+
+modules:
+  tts:
+    preload_model: true  # 启动时预加载模型
+    audio_cache_size: 200
+  asr:
+    max_concurrent_requests: 10
 ```
 
 **模型选择：**
 - 使用较小的 Ollama 模型
 - 启用音频缓存
+- 预加载 TTS 模型（如果内存充足）
 </details>
-
-**更多问题？** 查看 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 获取详细故障排除指南。
 
 ---
 
@@ -409,10 +582,11 @@ MAX_CONCURRENT_REQUESTS=10
 
 - [ ] 支持多角色切换
 - [ ] 自定义表情和动作库
-- [ ] 语音克隆功能
+- [ ] 语音克隆功能增强
 - [ ] 移动端适配
 - [ ] Docker 一键部署
 - [ ] WebRTC 实时通话
+- [ ] 插件系统支持
 
 ---
 
