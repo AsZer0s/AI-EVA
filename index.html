@@ -1009,28 +1009,6 @@
         <div class="status" id="connection-status">系统已连接</div>
       </div>
       
-      <div class="control-section" id="ai-model-section">
-        <h3>
-          <span class="material-icons-round">smart_toy</span>
-          AI 模型
-        </h3>
-        <div class="slider-container" id="model-selector" style="display: none;">
-          <label>Ollama 模型:</label>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <select id="ollama-model" class="chat-input" style="flex: 1;">
-              <option value="">正在加载模型...</option>
-            </select>
-            <button id="refresh-models" class="btn-primary" style="padding: 8px; font-size: 12px;" title="刷新模型列表">
-              <span class="material-icons-round">refresh</span>
-            </button>
-          </div>
-        </div>
-        <div class="status" id="ollama-status">
-          <span class="status-indicator" id="ollama-indicator">●</span>
-          <span id="ollama-text">Ollama 未连接</span>
-        </div>
-      </div>
-      
       <div class="control-section" id="voice-settings">
         <h3>
           <span class="material-icons-round">record_voice_over</span>
@@ -1050,13 +1028,21 @@
           <label>语速: <span class="value" id="tts-speed-value">1.0x</span></label>
           <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0">
         </div>
-        <div class="status" id="tts-status">
-          <span class="status-indicator" id="tts-indicator">●</span>
-          <span id="tts-text">IndexTTS2 未连接</span>
-        </div>
         <div class="status" id="backend-status" style="margin-top: 8px;">
           <span class="status-indicator" id="backend-indicator">●</span>
           <span id="backend-text">后端完整流程 未连接</span>
+        </div>
+        <div class="status" id="asr-status" style="margin-top: 8px;">
+          <span class="status-indicator" id="asr-indicator">●</span>
+          <span id="asr-text">ASR 未连接</span>
+        </div>
+        <div class="status" id="vad-status" style="margin-top: 8px;">
+          <span class="status-indicator" id="vad-indicator">●</span>
+          <span id="vad-text">VAD 未连接</span>
+        </div>
+        <div class="status" id="tts-status" style="margin-top: 8px;">
+          <span class="status-indicator" id="tts-indicator">●</span>
+          <span id="tts-text">TTS 未连接</span>
         </div>
       </div>
       
@@ -1248,23 +1234,18 @@
       <div class="mb-4 p-3 bg-yellow-50 rounded-lg">
         <p class="text-sm text-yellow-800">请根据您的服务配置正确地址：</p>
         <ul class="text-xs text-yellow-700 mt-2 list-disc list-inside">
-          <li>Ollama默认端口: 11434</li>
-          <li>IndexTTS2默认端口: 127.0.0.1:9966</li>
+          <li>后端API默认端口: 8000</li>
         </ul>
       </div>
-      <label class="block mb-2">Ollama服务器地址 (AI对话)
-        <input type="text" id="ollama-url" value="http://127.0.0.1:11434" class="w-full p-2 border rounded" />
-        <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:8000 或 http://127.0.0.1:8000</div>
-      </label>
-      <label class="block mb-2">IndexTTS2服务器地址 (语音合成)
+      <label class="block mb-2">IndexTTS2服务器地址 (语音合成，备用)
         <input type="text" id="chat-tts-url" value="http://127.0.0.1:9966" class="w-full p-2 border rounded" />
         <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:9966</div>
       </label>
-      <label class="block mb-2">SenseVoice服务器地址 (语音识别)
+      <label class="block mb-2">SenseVoice服务器地址 (语音识别，备用)
         <input type="text" id="sensevoice-url" value="http://127.0.0.1:50000" class="w-full p-2 border rounded" />
         <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:50000</div>
       </label>
-      <label class="block mb-2">后端API服务器地址 (完整流程)
+      <label class="block mb-2">后端API服务器地址 (完整流程，主要使用)
         <input type="text" id="backend-api-url" value="http://127.0.0.1:8000" class="w-full p-2 border rounded" />
         <div class="text-xs text-gray-500 mt-1">示例: http://127.0.0.1:8000 (音频->文本->AI->音频)</div>
       </label>
@@ -1386,16 +1367,6 @@
       <button id="preview-voice" class="w-full p-2 bg-orange-500 text-white rounded mt-2">预览当前音色</button>
       <button id="stop-tts" class="w-full p-2 bg-red-500 text-white rounded mt-2">停止TTS播放</button>
       <button id="test-ai-tts-flow" class="w-full p-2 bg-purple-500 text-white rounded mt-2">测试AI对话+TTS完整流程</button>
-    </div>
-    
-    <!-- Ollama设置 -->
-    <div class="control-group">
-      <h3 class="text-xl">Ollama设置</h3>
-      <label class="block mb-2">模型名称
-        <input type="text" id="ollama-model" value="gemma2:2b" class="w-full p-2 border rounded" />
-        <div class="text-xs text-gray-500 mt-1">常用模型: gemma2:2b, llama2, qwen2.5:3b</div>
-      </label>
-      <button id="test-connection" class="p-2 bg-blue-500 text-white rounded w-full">测试连接</button>
     </div>
     
     <div class="control-group">
@@ -1823,29 +1794,21 @@ function checkTutorial() {
 }
 
 function initApiSettings() {
-  const savedOllamaUrl = localStorage.getItem('ollama-url') || "http://127.0.0.1:11434";
   const savedChatTtsUrl = localStorage.getItem('chat-tts-url') || "http://127.0.0.1:9966";
   const savedSensevoiceUrl = localStorage.getItem('sensevoice-url') || "http://127.0.0.1:50000";
   const savedBackendApiUrl = localStorage.getItem('backend-api-url') || "http://127.0.0.1:8000";
   
-  document.getElementById('ollama-url').value = savedOllamaUrl;
-  document.getElementById('chat-tts-url').value = savedChatTtsUrl;
-  document.getElementById('sensevoice-url').value = savedSensevoiceUrl;
-  document.getElementById('backend-api-url').value = savedBackendApiUrl;
+  const chatTtsUrlInput = document.getElementById('chat-tts-url');
+  const sensevoiceUrlInput = document.getElementById('sensevoice-url');
+  const backendApiUrlInput = document.getElementById('backend-api-url');
   
-  OLLAMA_API = savedOllamaUrl;
+  if (chatTtsUrlInput) chatTtsUrlInput.value = savedChatTtsUrl;
+  if (sensevoiceUrlInput) sensevoiceUrlInput.value = savedSensevoiceUrl;
+  if (backendApiUrlInput) backendApiUrlInput.value = savedBackendApiUrl;
+  
   CHAT_TTS_API = savedChatTtsUrl;
   SENSEVOICE_API = savedSensevoiceUrl;
   BACKEND_API = savedBackendApiUrl;
-  
-  document.getElementById('ollama-url').addEventListener('change', function() {
-    OLLAMA_API = this.value;
-    ollamaUrl = this.value;  // 同步更新 ollamaUrl
-    localStorage.setItem('ollama-url', OLLAMA_API);
-    console.log('Ollama服务器地址已更新为: ' + OLLAMA_API);
-    addMsg("系统", `Ollama服务器地址已更新为: ${OLLAMA_API}`);
-    initOllamaConnection();  // 重新连接
-  });
   
   document.getElementById('chat-tts-url').addEventListener('change', function() {
     CHAT_TTS_API = this.value;
@@ -1869,7 +1832,6 @@ function initApiSettings() {
   });
   
   document.getElementById('save-api-config').addEventListener('click', function() {
-    localStorage.setItem('ollama-url', OLLAMA_API);
     localStorage.setItem('chat-tts-url', CHAT_TTS_API);
     localStorage.setItem('sensevoice-url', SENSEVOICE_API);
     localStorage.setItem('backend-api-url', BACKEND_API);
@@ -1889,8 +1851,13 @@ function initApiSettings() {
   
   document.getElementById('test-ai-voice').addEventListener('click', async function() {
     // 测试后端完整流程
-    const backendConnected = await testBackendConnection();
-    if (backendConnected) {
+    const healthStatus = await testBackendConnection();
+    if (healthStatus) {
+      if (!healthStatus.tts_loaded) {
+        addMsg("系统", "⚠️ TTS组件未加载，无法测试语音功能");
+        return;
+      }
+      
       try {
         addMsg("系统", "正在测试后端完整流程...");
         const response = await fetch(`${BACKEND_API}/api/chat/text`, {
@@ -1905,7 +1872,8 @@ function initApiSettings() {
         });
         
         if (response.ok) {
-          const aiReply = response.headers.get('X-AI-Reply') || '';
+          const aiReplyEncoded = response.headers.get('X-AI-Reply') || '';
+          const aiReply = aiReplyEncoded ? decodeURIComponent(aiReplyEncoded) : '';
           const audioBlob = await response.blob();
           const audioUrl = URL.createObjectURL(audioBlob);
           
@@ -1930,110 +1898,56 @@ async function testAllConnections() {
   const resultsDiv = document.getElementById('connection-results');
   resultsDiv.innerHTML = '<div class="text-blue-500">正在测试连接...</div>';
   
-  let ollamaStatus = await testOllamaConnection();
-  let chatTtsStatus = await testChatTTSConnection();
-  let backendStatus = await testBackendConnection();
+  const healthStatus = await testBackendConnection();
   
   let html = '<div class="mt-2 space-y-1">';
-  html += `<div class="${backendStatus ? 'text-green-500' : 'text-red-500'}">后端API: ${backendStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
-  html += `<div class="${ollamaStatus ? 'text-green-500' : 'text-red-500'}">Ollama: ${ollamaStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
-  html += `<div class="${chatTtsStatus ? 'text-green-500' : 'text-red-500'}">IndexTTS2: ${chatTtsStatus ? '✓ 连接成功' : '✗ 连接失败'}</div>`;
-  html += '</div>';
   
-  resultsDiv.innerHTML = html;
-  
-  if (backendStatus) {
+  if (healthStatus) {
+    html += `<div class="text-green-500">后端API: ✓ 连接成功</div>`;
+    html += `<div class="${healthStatus.asr_loaded ? 'text-green-500' : 'text-red-500'}">ASR (语音识别): ${healthStatus.asr_loaded ? '✓ 已加载' : '✗ 未加载'}</div>`;
+    html += `<div class="${healthStatus.vad_loaded ? 'text-green-500' : 'text-red-500'}">VAD (语音检测): ${healthStatus.vad_loaded ? '✓ 已加载' : '✗ 未加载'}</div>`;
+    html += `<div class="${healthStatus.tts_loaded ? 'text-green-500' : 'text-red-500'}">TTS (语音合成): ${healthStatus.tts_loaded ? '✓ 已加载' : '✗ 未加载'}</div>`;
+    
+    // 更新各个组件的状态显示
+    updateServiceStatus('backend', 'connected', '后端完整流程已连接');
+    updateServiceStatus('asr', healthStatus.asr_loaded ? 'connected' : 'disconnected', 
+      healthStatus.asr_loaded ? 'ASR 已加载' : 'ASR 未加载');
+    updateServiceStatus('vad', healthStatus.vad_loaded ? 'connected' : 'disconnected', 
+      healthStatus.vad_loaded ? 'VAD 已加载' : 'VAD 未加载');
+    updateServiceStatus('tts', healthStatus.tts_loaded ? 'connected' : 'disconnected', 
+      healthStatus.tts_loaded ? 'TTS 已加载' : 'TTS 未加载');
+    
     updateConnectionStatus(true, "后端完整流程已连接");
-  } else if (ollamaStatus && chatTtsStatus) {
-    updateConnectionStatus(true, "AI+TTS已连接（未使用后端）");
-  } else if (ollamaStatus) {
-    updateConnectionStatus(true, "AI已连接，TTS未连接");
-  } else if (chatTtsStatus) {
-    updateConnectionStatus(false, "TTS已连接，AI未连接");
   } else {
+    html += `<div class="text-red-500">后端API: ✗ 连接失败</div>`;
+    updateServiceStatus('backend', 'disconnected', '后端API未连接');
     updateConnectionStatus(false, "未连接");
   }
+  
+  html += '</div>';
+  resultsDiv.innerHTML = html;
 }
 
 async function testBackendConnection() {
   try {
     const response = await fetch(`${BACKEND_API}/api/health`, {
-      method: 'GET',
-      timeout: 3000
+      method: 'GET'
     });
     if (response.ok) {
       const data = await response.json();
-      console.log("✅ 后端API连接成功:", data);
-      return true;
+      console.log("✅ 后端API健康检查成功:", data);
+      return data; // 返回完整的健康状态对象
     }
-    return false;
+    console.warn("❌ 后端API响应异常:", response.status);
+    return null;
   } catch (error) {
     console.warn("❌ 后端API连接失败:", error);
-    return false;
+    return null;
   }
 }
 
-async function testOllamaConnection() {
-  // 确保 ollamaUrl 与 OLLAMA_API 同步
-  if (!ollamaUrl || ollamaUrl !== OLLAMA_API) {
-    ollamaUrl = OLLAMA_API;
-    console.log('同步 ollamaUrl:', ollamaUrl);
-  }
-  
-  try {
-    const testUrl = `${ollamaUrl}/api/tags`;
-    console.log('🔍 测试 Ollama 连接:', testUrl);
-    const response = await fetch(testUrl);
-    if (response.ok) {
-      console.log("✅ Ollama 服务器连接成功");
-      return true;
-    }
-    console.warn("❌ Ollama 服务器响应异常:", response.status, response.statusText);
-    return false;
-  } catch (error) {
-    console.warn("❌ Ollama 服务器连接失败:", error);
-    return false;
-  }
-}
-
-async function testChatTTSConnection() {
-  try {
-    const response = await fetch(`${chatTtsServer}/`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log("✅ IndexTTS2 服务器连接成功:", data);
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.warn("❌ IndexTTS2 服务器连接失败:", error);
-    return false;
-  }
-}
-
-// 已移除：旧的playAIResponse函数，现在使用后端完整流程接口
-
-async function initOllamaConnection() {
-  const success = await testOllamaConnection();
-  
-  if (success) {
-    isConnected = true;
-    updateConnectionStatus(true, "已连接");
-    console.log("Ollama连接成功");
-    addMsg("系统", "Ollama连接成功");
-  } else {
-    isConnected = false;
-    updateConnectionStatus(false, "");
-    console.error("Ollama连接失败");
-    addMsg("系统", "Ollama连接失败，请检查服务器地址和端口");
-  }
-}
+// 已移除：旧的独立服务连接测试函数（testOllamaConnection、testChatTTSConnection、initOllamaConnection）
+// 现在统一使用后端健康检查接口获取所有组件状态
 
 function updateConnectionStatus(connected, message) {
   const statusElement = document.getElementById('connection-status');
@@ -2187,15 +2101,31 @@ async function sendMessageToAI(message) {
       throw new Error(`后端处理失败: ${response.status} - ${errorText}`);
     }
     
-    // 获取响应头中的文本信息
-    const userText = response.headers.get('X-User-Text') || message;
-    const aiReply = response.headers.get('X-AI-Reply') || '';
+    // 获取响应头中的文本信息（需要解码URL编码）
+    const userTextEncoded = response.headers.get('X-User-Text') || '';
+    const aiReplyEncoded = response.headers.get('X-AI-Reply') || '';
     
-    console.log('📥 用户文本:', userText);
-    console.log('📥 AI回复:', aiReply);
+    console.log('📥 原始响应头 - X-User-Text:', userTextEncoded);
+    console.log('📥 原始响应头 - X-AI-Reply:', aiReplyEncoded);
+    
+    let userText = message;
+    let aiReply = '';
+    
+    try {
+      userText = userTextEncoded ? decodeURIComponent(userTextEncoded) : message;
+      aiReply = aiReplyEncoded ? decodeURIComponent(aiReplyEncoded) : '';
+    } catch (e) {
+      console.error('❌ 响应头解码失败:', e);
+      // 如果解码失败，尝试直接使用原始值
+      userText = userTextEncoded || message;
+      aiReply = aiReplyEncoded || '';
+    }
+    
+    console.log('📥 解码后 - 用户文本:', userText);
+    console.log('📥 解码后 - AI回复:', aiReply);
     
     if (!aiReply) {
-      console.warn('⚠️ AI 回复为空');
+      console.warn('⚠️ AI 回复为空，原始值:', aiReplyEncoded);
       addMsg("系统", "AI 回复为空");
       return;
     }
@@ -2349,39 +2279,66 @@ async function typewriterEffect(sender, text, speed = 30) {
     messageContainer.className = 'message-container ai-message';
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
-    bubble.innerHTML = '<span id="typing-text"></span><span id="typing-cursor">|</span>';
+    
+    // 使用唯一ID避免多个消息之间的冲突
+    const uniqueId = 'typing-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const typingText = document.createElement('span');
+    typingText.id = uniqueId + '-text';
+    const cursor = document.createElement('span');
+    cursor.id = uniqueId + '-cursor';
+    cursor.textContent = '|';
+    
+    bubble.appendChild(typingText);
+    bubble.appendChild(cursor);
     messageContainer.appendChild(bubble);
+    
+    chatMessages.appendChild(messageContainer);
+    
+    // 直接使用创建的元素引用，而不是通过getElementById查找
+    for (let i = 0; i <= text.length; i++) {
+      typingText.textContent = text.substring(0, i);
+      await new Promise(resolve => setTimeout(resolve, speed));
+    }
+    
+    cursor.remove();
   } else {
     messageContainer.className = 'message-container system-message';
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
     bubble.innerHTML = text;
     messageContainer.appendChild(bubble);
-  }
-  
-  chatMessages.appendChild(messageContainer);
-  
-  if (sender === 'AI助手') {
-    const typingText = document.getElementById('typing-text');
-    const cursor = document.getElementById('typing-cursor');
-    
-    for (let i = 0; i <= text.length; i++) {
-      typingText.textContent = text.substring(0, i);
-      await new Promise(resolve => setTimeout(resolve, speed));
-    }
-    
-    if (cursor) cursor.remove();
+    chatMessages.appendChild(messageContainer);
   }
   
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// 已移除：旧的SenseVoice直接调用逻辑，现在由后端完整流程接口处理
-
 async function startAudioRecording() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    const audioConstraints = {
+      audio: {
+        sampleRate: 48000,
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        latency: 0
+      }
+    };
+    
+    const stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+    
+    let mimeType = 'audio/webm';
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      mimeType = 'audio/webm;codecs=opus';
+    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+      mimeType = 'audio/webm';
+    }
+    
+    mediaRecorder = new MediaRecorder(stream, { 
+      mimeType: mimeType,
+      audioBitsPerSecond: 128000
+    });
     audioChunks = [];
     
     mediaRecorder.ondataavailable = event => {
@@ -2391,7 +2348,6 @@ async function startAudioRecording() {
     mediaRecorder.onstop = async () => {
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       
-      // 使用后端完整流程接口：音频 -> 文本 -> AI -> 音频
       await processAudioWithBackend(audioBlob);
       
       stream.getTracks().forEach(track => track.stop());
@@ -2411,14 +2367,14 @@ async function startAudioRecording() {
 }
 
 // 使用后端完整流程处理音频
-async function processAudioWithBackend(audioBlob) {
+async function processAudioWithBackend(inputAudioBlob) {
   try {
     document.getElementById('voice-indicator').style.display = 'block';
     document.getElementById('voice-text').textContent = '正在处理...';
     
     // 将音频转换为WAV格式（后端需要）
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await audioBlob.arrayBuffer();
+    const arrayBuffer = await inputAudioBlob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     
     // 转换为WAV格式
@@ -2449,9 +2405,11 @@ async function processAudioWithBackend(audioBlob) {
       throw new Error(`后端处理失败: ${response.status} - ${errorText}`);
     }
     
-    // 获取响应头中的文本信息
-    const userText = response.headers.get('X-User-Text') || '';
-    const aiReply = response.headers.get('X-AI-Reply') || '';
+    // 获取响应头中的文本信息（需要解码URL编码）
+    const userTextEncoded = response.headers.get('X-User-Text') || '';
+    const aiReplyEncoded = response.headers.get('X-AI-Reply') || '';
+    const userText = userTextEncoded ? decodeURIComponent(userTextEncoded) : '';
+    const aiReply = aiReplyEncoded ? decodeURIComponent(aiReplyEncoded) : '';
     
     console.log('📥 用户语音识别:', userText);
     console.log('📥 AI回复:', aiReply);
@@ -2471,8 +2429,8 @@ async function processAudioWithBackend(audioBlob) {
     saveConversationHistory();
     
     // 获取音频数据并播放
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
+    const responseAudioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(responseAudioBlob);
     
     // 播放音频
     currentAudio = new Audio(audioUrl);
@@ -4331,23 +4289,7 @@ function initEvents(){
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
 
-  // Ollama设置更新
-  document.getElementById('ollama-url').addEventListener('change', function() {
-    ollamaUrl = this.value;
-    initOllamaConnection();
-  });
-  
-  document.getElementById('ollama-model').addEventListener('change', function() {
-    ollamaModel = this.value;
-    conversationHistory = []; // 清空历史记录
-    addMsg("系统", `已切换到模型: ${ollamaModel}`);
-  });
-  
-  // 测试连接按钮
-  const testConnectionBtn = document.getElementById('test-connection');
-  if (testConnectionBtn) {
-    testConnectionBtn.addEventListener('click', initOllamaConnection);
-  }
+  // 已移除：Ollama相关设置，现在只使用后端API
 
   // 截图功能
   const screenshotBtn = document.getElementById('screenshot-btn');
@@ -4485,21 +4427,8 @@ function updateServiceStatus(service, status, message = '') {
         indicator.classList.add('connected');
         text.textContent = message || `${service} 已连接`;
         
-        // 如果是 Ollama 连接成功，显示模型选择器并获取模型列表
-        if (service === 'ollama') {
-          const modelSelector = document.getElementById('model-selector');
-          if (modelSelector) {
-            modelSelector.style.display = 'block';
-            modelSelector.style.animation = 'slideDown 0.4s ease-out';
-            // 动画结束后移除动画类
-            setTimeout(() => {
-              modelSelector.style.animation = '';
-            }, 400);
-          }
-          
-          // 获取模型列表（首次连接时非静默模式）
-          fetchOllamaModels(false);
-        }
+        // 注意：现在只使用后端API，Ollama模型选择器已禁用
+        // 如需使用Ollama模型选择，请手动刷新
         break;
       case 'connecting':
         indicator.classList.add('connecting');
@@ -4509,130 +4438,24 @@ function updateServiceStatus(service, status, message = '') {
         indicator.classList.add('disconnected');
         text.textContent = message || `${service} 未连接`;
         
-        // 如果是 Ollama 断开连接，隐藏模型选择器
-        if (service === 'ollama') {
-          const modelSelector = document.getElementById('model-selector');
-          if (modelSelector) {
-            modelSelector.style.animation = 'slideUp 0.3s ease-in';
-            setTimeout(() => {
-              modelSelector.style.display = 'none';
-              modelSelector.style.animation = '';
-            }, 300);
-          }
-        }
+        // 注意：现在只使用后端API，Ollama相关UI已禁用
         break;
       case 'error':
         indicator.classList.add('disconnected');
         text.textContent = message || `${service} 连接错误`;
         
-        // 如果是 Ollama 连接错误，隐藏模型选择器
-        if (service === 'ollama') {
-          const modelSelector = document.getElementById('model-selector');
-          if (modelSelector) {
-            modelSelector.style.animation = 'slideUp 0.3s ease-in';
-            setTimeout(() => {
-              modelSelector.style.display = 'none';
-              modelSelector.style.animation = '';
-            }, 300);
-          }
-        }
+        // 注意：现在只使用后端API，Ollama相关UI已禁用
         break;
     }
   }
 }
 
 // 获取Ollama模型列表（隐式刷新，不打断用户操作）
+// 已禁用：fetchOllamaModels函数（备用功能）
+// 现在只使用后端API，如需获取Ollama模型列表，请手动调用此函数
 async function fetchOllamaModels(silent = false) {
-  const modelSelect = document.getElementById('ollama-model');
-  if (!modelSelect) return false;
-  
-  // 如果下拉菜单正在打开（用户正在操作），跳过刷新
-  if (document.activeElement === modelSelect) {
-    if (!silent) {
-      console.log('下拉菜单正在使用，跳过刷新');
-    }
-    return false;
-  }
-  
-  try {
-    const response = await fetch(`${OLLAMA_API}/api/tags`, {
-      method: 'GET',
-      timeout: 5000
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      const models = data.models || [];
-      
-      // 保存当前选中的值
-      const currentValue = modelSelect.value;
-      const currentOptions = Array.from(modelSelect.options).map(opt => ({
-        value: opt.value,
-        text: opt.textContent
-      }));
-      
-      // 检查模型列表是否有变化
-      const modelNames = models.map(m => m.name).sort().join(',');
-      const currentModelNames = currentOptions
-        .filter(opt => opt.value)
-        .map(opt => opt.value.split(' ')[0]) // 提取模型名（去掉大小信息）
-        .sort()
-        .join(',');
-      
-      // 如果模型列表没有变化，不更新UI
-      if (modelNames === currentModelNames && models.length > 0) {
-        if (!silent) {
-          console.log('模型列表未变化，跳过UI更新');
-        }
-        return true;
-      }
-      
-      // 更新模型选择器（只在有变化时）
-      modelSelect.innerHTML = '';
-      
-      if (models.length > 0) {
-        // 添加模型选项
-        models.forEach(model => {
-          const option = document.createElement('option');
-          option.value = model.name;
-          option.textContent = `${model.name} (${formatModelSize(model.size)})`;
-          modelSelect.appendChild(option);
-        });
-        
-        // 恢复之前选中的值，如果不存在则选择第一个
-        if (currentValue && models.some(m => m.name === currentValue)) {
-          modelSelect.value = currentValue;
-        } else if (models.length > 0) {
-          modelSelect.value = models[0].name;
-          // 如果值改变了，触发change事件
-          if (currentValue !== models[0].name) {
-            modelSelect.dispatchEvent(new Event('change'));
-          }
-        }
-      } else {
-        // 没有模型时显示提示
-        const option = document.createElement('option');
-        option.value = '';
-        option.textContent = '未找到可用模型';
-        modelSelect.appendChild(option);
-      }
-      
-      return true;
-    } else {
-      throw new Error('Failed to fetch models');
-    }
-  } catch (error) {
-    console.error('获取Ollama模型失败:', error);
-    
-    // 只在当前没有选项或选项是错误提示时才更新
-    const currentOptions = Array.from(modelSelect.options);
-    if (currentOptions.length === 0 || 
-        (currentOptions.length === 1 && currentOptions[0].textContent.includes('获取模型失败'))) {
-      modelSelect.innerHTML = '<option value="">获取模型失败</option>';
-    }
-    
-    return false;
-  }
+  console.warn('⚠️ fetchOllamaModels已禁用，现在只使用后端API');
+  return false;
 }
 
 // 格式化模型大小
@@ -4644,73 +4467,41 @@ function formatModelSize(bytes) {
   return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-// 实时监控服务状态
+// 实时监控服务状态（只使用后端健康检查接口）
 async function monitorServices() {
-  // 优先检查后端完整流程API状态
   try {
     const response = await fetch(`${BACKEND_API}/api/health`, {
-      method: 'GET',
-      timeout: 3000
+      method: 'GET'
     });
     if (response.ok) {
       const data = await response.json();
+      console.log("✅ 后端健康检查:", data);
+      
+      // 更新后端状态
       updateServiceStatus('backend', 'connected', '后端完整流程已连接');
-      // 如果后端连接成功，更新连接状态
       updateConnectionStatus(true, "后端完整流程已连接");
+      
+      // 更新各个组件的状态
+      updateServiceStatus('asr', data.asr_loaded ? 'connected' : 'disconnected', 
+        data.asr_loaded ? 'ASR 已加载' : 'ASR 未加载');
+      updateServiceStatus('vad', data.vad_loaded ? 'connected' : 'disconnected', 
+        data.vad_loaded ? 'VAD 已加载' : 'VAD 未加载');
+      updateServiceStatus('tts', data.tts_loaded ? 'connected' : 'disconnected', 
+        data.tts_loaded ? 'TTS 已加载' : 'TTS 未加载');
     } else {
       updateServiceStatus('backend', 'disconnected', '后端API未响应');
+      updateServiceStatus('asr', 'disconnected', 'ASR 未连接');
+      updateServiceStatus('vad', 'disconnected', 'VAD 未连接');
+      updateServiceStatus('tts', 'disconnected', 'TTS 未连接');
+      updateConnectionStatus(false, "未连接");
     }
   } catch (error) {
+    console.warn("❌ 后端健康检查失败:", error);
     updateServiceStatus('backend', 'disconnected', '后端API未连接');
-  }
-  
-  // 检查 Ollama 状态（备用）
-  try {
-    updateServiceStatus('ollama', 'connecting');
-    const response = await fetch(`${OLLAMA_API}/api/tags`, {
-      method: 'GET',
-      timeout: 3000
-    });
-    if (response.ok) {
-      updateServiceStatus('ollama', 'connected', 'Ollama 已连接');
-      // 连接成功时隐式获取模型列表（不打断用户操作）
-      await fetchOllamaModels(true); // silent = true
-    } else {
-      updateServiceStatus('ollama', 'disconnected', 'Ollama 未响应');
-    }
-  } catch (error) {
-    updateServiceStatus('ollama', 'disconnected', 'Ollama 未连接');
-  }
-  
-  // 检查 IndexTTS2 状态（备用）
-  try {
-    updateServiceStatus('tts', 'connecting');
-    const response = await fetch(`${CHAT_TTS_API}/health`, {
-      method: 'GET',
-      timeout: 3000
-    });
-    if (response.ok) {
-      updateServiceStatus('tts', 'connected', 'IndexTTS2 已连接');
-    } else {
-      updateServiceStatus('tts', 'disconnected', 'IndexTTS2 未响应');
-    }
-  } catch (error) {
-    updateServiceStatus('tts', 'disconnected', 'IndexTTS2 未连接');
-  }
-  
-  // 检查 SenseVoice 状态（备用）
-  try {
-    const response = await fetch(`${SENSEVOICE_API}/health`, {
-      method: 'GET',
-      timeout: 3000
-    });
-    if (response.ok) {
-      updateServiceStatus('sensevoice', 'connected', 'SenseVoice 已连接');
-    } else {
-      updateServiceStatus('sensevoice', 'disconnected', 'SenseVoice 未响应');
-    }
-  } catch (error) {
-    updateServiceStatus('sensevoice', 'disconnected', 'SenseVoice 未连接');
+    updateServiceStatus('asr', 'disconnected', 'ASR 未连接');
+    updateServiceStatus('vad', 'disconnected', 'VAD 未连接');
+    updateServiceStatus('tts', 'disconnected', 'TTS 未连接');
+    updateConnectionStatus(false, "未连接");
   }
 }
 
@@ -4769,31 +4560,7 @@ function initMobileControlPanel() {
   }
 }
 
-// 初始化模型刷新功能
-function initModelRefresh() {
-  const refreshBtn = document.getElementById('refresh-models');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      // 显示加载状态
-      const modelSelect = document.getElementById('ollama-model');
-      if (modelSelect) {
-        modelSelect.innerHTML = '<option value="">正在刷新模型...</option>';
-      }
-      
-      // 添加旋转动画
-      refreshBtn.style.animation = 'spin 1s linear infinite';
-      
-      try {
-        await fetchOllamaModels();
-      } catch (error) {
-        console.error('刷新模型失败:', error);
-      } finally {
-        // 移除旋转动画
-        refreshBtn.style.animation = '';
-      }
-    });
-  }
-}
+// 已移除：initModelRefresh函数，现在只使用后端API
 
 // 初始化所有功能
 // 初始化模型控制
@@ -4944,7 +4711,7 @@ function initModelControls() {
 // 自动加载默认 VRM 模型
 function loadDefaultVRM() {
   // 默认模型路径，可以修改为实际的模型路径
-  const defaultModelPath = 'models/default.vrm';
+  const defaultModelPath = 'lili.vrm';
   
   // 尝试加载默认模型
   loadVRM(defaultModelPath);
@@ -4985,9 +4752,6 @@ async function initAll() {
   // 初始化移动端控制面板
   initMobileControlPanel();
   
-  // 初始化模型刷新功能
-  initModelRefresh();
-  
   // 显示消息建议（首次）
   setTimeout(() => {
     showMessageSuggestions();
@@ -4996,31 +4760,28 @@ async function initAll() {
   // 测试所有连接
   await testAllConnections();
   
-  // 优先测试后端完整流程API
-  const backendConnected = await testBackendConnection();
+  // 测试后端完整流程API
+  const healthStatus = await testBackendConnection();
   
-  if (backendConnected) {
+  if (healthStatus) {
     addMsg("系统", "🎉 系统初始化完成！后端完整流程API已连接");
+    addMsg("系统", `📊 组件状态: ASR=${healthStatus.asr_loaded ? '✓' : '✗'} VAD=${healthStatus.vad_loaded ? '✓' : '✗'} TTS=${healthStatus.tts_loaded ? '✓' : '✗'}`);
     addMsg("系统", "💡 现在可以使用完整流程：音频 -> 文本 -> AI -> 音频");
     addMsg("系统", "💡 试试说: \"你好\" 或使用快捷键 Ctrl+M 开启语音");
     updateConnectionStatus(true, "后端完整流程已连接");
+    
+    // 更新各个组件的状态显示
+    updateServiceStatus('asr', healthStatus.asr_loaded ? 'connected' : 'disconnected', 
+      healthStatus.asr_loaded ? 'ASR 已加载' : 'ASR 未加载');
+    updateServiceStatus('vad', healthStatus.vad_loaded ? 'connected' : 'disconnected', 
+      healthStatus.vad_loaded ? 'VAD 已加载' : 'VAD 未加载');
+    updateServiceStatus('tts', healthStatus.tts_loaded ? 'connected' : 'disconnected', 
+      healthStatus.tts_loaded ? 'TTS 已加载' : 'TTS 未加载');
   } else {
-    // 如果没有后端API，尝试使用旧的Ollama连接
-    await initOllamaConnection();
-    
-    const ollamaConnected = await testOllamaConnection();
-    const chatTtsConnected = await testChatTTSConnection();
-    
-    if (ollamaConnected && chatTtsConnected) {
-      addMsg("系统", "⚠️ 系统初始化完成！使用独立服务（Ollama + IndexTTS2）");
-      addMsg("系统", "💡 建议使用后端完整流程API以获得更好的体验");
-    } else if (ollamaConnected) {
-      addMsg("系统", "⚠️ 系统初始化完成！AI对话已就绪，语音功能未连接");
-    } else if (chatTtsConnected) {
-      addMsg("系统", "⚠️ 系统初始化完成！语音功能已就绪，AI对话未连接");
-    } else {
-      addMsg("系统", "❌ 系统初始化完成！请检查后端服务或AI和语音服务器连接");
-    }
+    addMsg("系统", "❌ 系统初始化完成！后端API未连接，请检查服务状态");
+    addMsg("系统", `💡 请确保后端服务运行在: ${BACKEND_API}`);
+    updateConnectionStatus(false, "未连接");
+    updateServiceStatus('backend', 'disconnected', '后端API未连接');
   }
 }
 

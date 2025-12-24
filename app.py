@@ -6,12 +6,14 @@ import os
 import io
 import logging
 from typing import Optional, Tuple
+from urllib.parse import quote
 import numpy as np
 import soundfile as sf
 import torch
 import torchaudio
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 import json
@@ -22,6 +24,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI陪伴对话服务", description="VAD + ASR + AI对话 + TTS完整流程")
+
+# 配置CORS，允许所有来源
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有HTTP方法
+    allow_headers=["*"],  # 允许所有请求头
+    expose_headers=["X-User-Text", "X-AI-Reply", "X-Audio-Sample-Rate"]  # 暴露自定义响应头供前端读取
+)
 
 # 使用配置
 config = Config()
@@ -86,16 +98,70 @@ def detect_speech(audio_data: np.ndarray, sample_rate: int = 16000) -> bool:
         # 转换为torch tensor
         audio_tensor = torch.from_numpy(audio_data).float()
         
-        # 如果采样率不匹配，需要重采样
-        if sample_rate != 16000:
-            resampler = torchaudio.transforms.Resample(sample_rate, 16000)
+        # 如果采样率不匹配，需要重采样到16000Hz
+        target_sample_rate = 16000
+        if sample_rate != target_sample_rate:
+            resampler = torchaudio.transforms.Resample(sample_rate, target_sample_rate)
             audio_tensor = resampler(audio_tensor)
+            sample_rate = target_sample_rate
         
-        # VAD检测
-        speech_prob = vad_model(audio_tensor, 16000).item()
-        return speech_prob > config.VAD_THRESHOLD
+        # VAD模型需要按帧处理：16000Hz时每帧512采样点
+        frame_size = 512  # 16000Hz时的帧大小
+        audio_length = audio_tensor.shape[0]
+        
+        # 如果音频太短，填充到至少一帧
+        if audio_length < frame_size:
+            padding = torch.zeros(frame_size - audio_length)
+            audio_tensor = torch.cat([audio_tensor, padding])
+            audio_length = frame_size
+        
+        # 将音频分帧处理
+        has_speech = False
+        num_frames = (audio_length + frame_size - 1) // frame_size  # 向上取整
+        
+        for i in range(num_frames):
+            start_idx = i * frame_size
+            end_idx = min(start_idx + frame_size, audio_length)
+            
+            # 提取当前帧
+            frame = audio_tensor[start_idx:end_idx]
+            
+            # 如果帧不够512采样点，需要填充
+            if frame.shape[0] < frame_size:
+                padding = torch.zeros(frame_size - frame.shape[0])
+                frame = torch.cat([frame, padding])
+            
+            # 确保frame是1D tensor，shape为[512]
+            if len(frame.shape) == 0:
+                frame = frame.unsqueeze(0)
+            if frame.shape[0] != frame_size:
+                # 如果还是不对，截取或填充
+                if frame.shape[0] > frame_size:
+                    frame = frame[:frame_size]
+                else:
+                    padding = torch.zeros(frame_size - frame.shape[0])
+                    frame = torch.cat([frame, padding])
+            
+            # 添加batch维度：[1, 512]
+            frame = frame.unsqueeze(0)
+            
+            # VAD检测当前帧
+            try:
+                speech_prob = vad_model(frame, target_sample_rate).item()
+                if speech_prob > config.VAD_THRESHOLD:
+                    has_speech = True
+                    break  # 只要有一帧检测到语音就返回True
+            except Exception as frame_error:
+                logger.debug(f"帧 {i} VAD检测失败: {frame_error}")
+                continue
+        
+        # 如果所有帧都没有检测到语音，返回False
+        return has_speech
+        
     except Exception as e:
         logger.error(f"VAD检测失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return True  # 出错时默认认为有语音
 
 # ==================== ASR语音识别模块 ====================
@@ -121,10 +187,26 @@ def transcribe_audio(audio_data: np.ndarray, sample_rate: int = 16000) -> str:
         raise RuntimeError("ASR模型未初始化")
     
     try:
-        cache = {}
-        chunk_stride = config.ASR_CHUNK_SIZE[1] * 960  # 600ms
+        target_sample_rate = 16000
+        
+        if len(audio_data.shape) > 1:
+            audio_data = audio_data[:, 0]
+        
+        if sample_rate != target_sample_rate:
+            logger.info(f"ASR重采样: {sample_rate}Hz -> {target_sample_rate}Hz")
+            audio_tensor = torch.from_numpy(audio_data).float()
+            resampler = torchaudio.transforms.Resample(sample_rate, target_sample_rate)
+            audio_tensor = resampler(audio_tensor)
+            audio_data = audio_tensor.numpy()
+            sample_rate = target_sample_rate
+        
+        chunk_stride = config.ASR_CHUNK_SIZE[1] * 960
+        
         total_chunk_num = int((len(audio_data) - 1) / chunk_stride + 1)
         
+        logger.debug(f"ASR处理: 音频长度={len(audio_data)}采样点, 采样率={sample_rate}Hz, chunk_stride={chunk_stride}, 总chunk数={total_chunk_num}")
+        
+        cache = {}
         full_text = ""
         for i in range(total_chunk_num):
             speech_chunk = audio_data[i * chunk_stride:(i + 1) * chunk_stride]
@@ -143,9 +225,13 @@ def transcribe_audio(audio_data: np.ndarray, sample_rate: int = 16000) -> str:
                 if text:
                     full_text += text
         
-        return full_text.strip()
+        result = full_text.strip()
+        logger.debug(f"ASR识别结果: {result}")
+        return result
     except Exception as e:
         logger.error(f"ASR识别失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise
 
 # ==================== AI对话模块 ====================
@@ -154,6 +240,15 @@ def chat_with_ai(user_text: str, conversation_history: list = None) -> str:
     try:
         # 构建消息历史（OpenAI标准格式）
         messages = []
+        
+        # 添加system prompt（如果配置了的话）
+        if config.SYSTEM_PROMPT:
+            messages.append({
+                "role": "system",
+                "content": config.SYSTEM_PROMPT
+            })
+        
+        # 添加对话历史
         if conversation_history:
             messages.extend(conversation_history)
         
@@ -696,8 +791,8 @@ async def complete_with_audio_endpoint(
             tts_audio_io,
             media_type="audio/wav",
             headers={
-                "X-User-Text": user_text,
-                "X-AI-Reply": ai_reply
+                "X-User-Text": quote(user_text, safe=''),
+                "X-AI-Reply": quote(ai_reply, safe='')
             }
         )
             
@@ -785,8 +880,8 @@ async def chat_with_audio(
             tts_audio_io,
             media_type="audio/wav",
             headers={
-                "X-User-Text": user_text,
-                "X-AI-Reply": ai_reply,
+                "X-User-Text": quote(user_text, safe=''),
+                "X-AI-Reply": quote(ai_reply, safe=''),
                 "X-Audio-Sample-Rate": str(tts_sample_rate),
                 "Content-Disposition": "inline; filename=ai_reply.wav"
             }
@@ -837,12 +932,19 @@ async def chat_with_text(
         
         logger.info(f"返回音频: {len(tts_audio_io.getvalue())} bytes, 采样率={tts_sample_rate}Hz")
         
+        # 编码响应头
+        encoded_user_text = quote(request.text, safe='')
+        encoded_ai_reply = quote(ai_reply, safe='')
+        
+        logger.info(f"响应头编码 - X-User-Text长度: {len(encoded_user_text)}, X-AI-Reply长度: {len(encoded_ai_reply)}")
+        logger.debug(f"响应头编码 - X-User-Text: {encoded_user_text[:100]}..., X-AI-Reply: {encoded_ai_reply[:100]}...")
+        
         return StreamingResponse(
             tts_audio_io,
             media_type="audio/wav",
             headers={
-                "X-User-Text": request.text,
-                "X-AI-Reply": ai_reply,
+                "X-User-Text": encoded_user_text,
+                "X-AI-Reply": encoded_ai_reply,
                 "X-Audio-Sample-Rate": str(tts_sample_rate),
                 "Content-Disposition": "inline; filename=ai_reply.wav"
             }
