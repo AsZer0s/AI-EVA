@@ -1,9 +1,0 @@
-# LLM 模块依赖
-# Ollama 客户端
-
-# HTTP 客户端
-httpx>=0.25.0
-
-# 配置管理
-pyyaml>=6.0
-

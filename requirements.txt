@@ -1,0 +1,79 @@
+funasr
+modelscope
+# ==================== 重要：PyTorch 必须单独安装 ====================
+# 不要通过 pip install -r requirements.txt 安装 torch！
+# 必须先安装 PyTorch，然后再安装其他依赖
+#
+# CPU 版本（推荐，兼容性最好）：
+# pip install torch==2.2.0+cpu torchaudio==2.2.0+cpu --index-url https://download.pytorch.org/whl/cpu
+#
+# GPU 版本（根据您的 CUDA 版本选择）：
+# CUDA 11.8: pip install torch==2.2.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu118
+# CUDA 12.1: pip install torch==2.2.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121
+#
+# 注意：PyTorch 2.9.1 在 Windows + Python 3.12 环境下有 DLL 加载问题，请使用 2.2.0 版本
+# ====================================================================
+
+# Web框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# 音频处理
+soundfile>=0.12.1
+numpy>=1.24.0
+scipy>=1.11.0
+
+# VAD声音检测
+silero-vad>=4.0.0
+
+# HTTP请求
+requests>=2.31.0
+httpx>=0.25.0
+
+# CosyVoice TTS 依赖
+addict>=2.4.0
+phonemizer>=3.2.1
+datasets<3.0.0,>=2.0.0
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+--extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ # https://github.com/microsoft/onnxruntime/issues/21684
+conformer==0.3.2
+deepspeed==0.15.1; sys_platform == 'linux'
+diffusers==0.29.0
+fastapi==0.115.6
+fastapi-cli==0.0.4
+gdown==5.1.0
+gradio==5.4.0
+hydra-core==1.3.2
+HyperPyYAML==1.2.2
+inflect==7.3.1
+librosa==0.10.2
+lightning==2.2.4
+matplotlib==3.7.5
+modelscope==1.20.0
+networkx==3.1
+numpy==1.26.4
+omegaconf==2.3.0
+onnx==1.16.0
+onnxruntime-gpu==1.18.0; sys_platform == 'linux'
+onnxruntime==1.18.0; sys_platform == 'darwin' or sys_platform == 'win32'
+openai-whisper==20231117
+protobuf==4.25
+pyarrow==18.1.0
+pydantic==2.7.0
+# pyworld==0.3.0
+rich==13.7.1
+soundfile==0.12.1
+tensorboard==2.14.0
+tensorrt-cu12==10.13.3.9; sys_platform == 'linux'
+tensorrt-cu12-bindings==10.13.3.9; sys_platform == 'linux'
+tensorrt-cu12-libs==10.13.3.9; sys_platform == 'linux'
+torch==2.3.1
+torchaudio==2.3.1
+torchvision==0.18.1
+transformers==4.51.3
+x-transformers==2.11.24
+uvicorn==0.30.0
+wetext==0.0.4
+wget==3.2
