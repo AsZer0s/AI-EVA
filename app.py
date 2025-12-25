@@ -447,16 +447,31 @@ def text_to_speech(text: str) -> Tuple[np.ndarray, int]:
             # 需要提供：文本、系统提示、参考音频路径
             import os
             
-            # 查找参考音频文件（CosyVoice目录下的asset/zero_shot_prompt.wav）
-            cosyvoice_path = os.path.join(os.path.dirname(__file__), 'CosyVoice')
-            ref_audio = os.path.join(cosyvoice_path, 'asset', 'zero_shot_prompt.wav')
+            # 使用配置文件中的参考音频路径
+            ref_audio = config.TTS_REF_AUDIO
             
-            # 如果参考音频不存在，尝试使用相对路径
+            # 检查参考音频是否存在，如果不存在则尝试备用路径
             if not os.path.exists(ref_audio):
-                ref_audio = os.path.join('CosyVoice', 'asset', 'zero_shot_prompt.wav')
-                if not os.path.exists(ref_audio):
-                    # 如果还是不存在，使用默认路径（CosyVoice会处理）
-                    ref_audio = './asset/zero_shot_prompt.wav'
+                logger.warning(f"参考音频不存在: {ref_audio}，尝试备用路径")
+                # 尝试备用路径
+                cosyvoice_path = os.path.join(os.path.dirname(__file__), 'CosyVoice')
+                backup_paths = [
+                    os.path.join(cosyvoice_path, 'asset', 'zero_shot_prompt.wav'),
+                    os.path.join('CosyVoice', 'asset', 'zero_shot_prompt.wav'),
+                    './asset/zero_shot_prompt.wav'
+                ]
+                
+                found = False
+                for backup_path in backup_paths:
+                    if os.path.exists(backup_path):
+                        ref_audio = backup_path
+                        found = True
+                        logger.info(f"使用备用参考音频路径: {ref_audio}")
+                        break
+                
+                if not found:
+                    logger.error(f"找不到参考音频文件，请检查配置 TTS_REF_AUDIO 或确保文件存在")
+                    raise FileNotFoundError(f"参考音频文件不存在: {ref_audio}")
             
             # CosyVoice3的调用方式
             # inference_zero_shot(text, system_prompt, ref_audio_path, stream=False)
@@ -464,17 +479,6 @@ def text_to_speech(text: str) -> Tuple[np.ndarray, int]:
             
             # 调用inference_zero_shot
             logger.info(f"TTS合成: 文本长度={len(text)}, 参考音频={ref_audio}")
-            
-            # 检查参考音频是否存在
-            if not os.path.exists(ref_audio):
-                logger.warning(f"参考音频不存在: {ref_audio}，将尝试使用默认路径")
-                # 尝试使用CosyVoice目录下的默认路径
-                default_ref = os.path.join(cosyvoice_path, 'asset', 'zero_shot_prompt.wav')
-                if os.path.exists(default_ref):
-                    ref_audio = default_ref
-                else:
-                    logger.error(f"找不到参考音频文件，请确保CosyVoice/asset/zero_shot_prompt.wav存在")
-                    raise FileNotFoundError(f"参考音频文件不存在: {ref_audio}")
             
             results = list(tts_model.inference_zero_shot(
                 text, 

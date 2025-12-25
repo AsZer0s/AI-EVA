@@ -6,7 +6,7 @@ import os
 class Config:
     """应用配置"""
     
-    # ==================== OpenAI兼容API配置 ====================
+    # ==================== API配置 ====================
     _default_api_url = "http://asben.hiyun.top:38080/v1/chat/completions"
     _default_api_key = "sk-octopus-QP99OhzxJAi0WLh6puiCG2yijDcmKhO7e4VXKh3QrFVIzKtI"
     
@@ -15,7 +15,6 @@ class Config:
     AI_API_KEY = os.getenv("AI_API_KEY") or os.getenv("OLLAMA_API_KEY") or _default_api_key
     AI_API_TIMEOUT = int(os.getenv("AI_API_TIMEOUT") or os.getenv("OLLAMA_TIMEOUT") or "30")
     
-    # System Prompt配置（可以通过环境变量 SYSTEM_PROMPT 设置）
     SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", """你是一个温暖贴心的女友，名字叫EVA001。
 
 重要原则：
@@ -26,8 +25,7 @@ class Config:
 5. 关注用户的情感需求，给予情感支持和陪伴
 
 对话风格：自然、温暖、简洁、有温度""")
-    
-    # 向后兼容：提供OLLAMA_*属性（直接指向AI_API_*）
+
     @property
     def OLLAMA_API_URL(self):
         """向后兼容属性"""
@@ -64,6 +62,10 @@ class Config:
     TTS_MODEL_ID = os.getenv("TTS_MODEL_ID", "FunAudioLLM/Fun-CosyVoice3-0.5B-2512")
     TTS_SAMPLE_RATE = int(os.getenv("TTS_SAMPLE_RATE", "24000"))
     
+    # TTS参考音频路径
+    _default_ref_audio = os.path.join(os.path.dirname(__file__), 'voice.wav')
+    TTS_REF_AUDIO = os.getenv("TTS_REF_AUDIO", _default_ref_audio)
+    
     # ==================== 服务器配置 ====================
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", "8000"))
@@ -72,4 +74,3 @@ class Config:
     # ==================== 音频处理配置 ====================
     MAX_AUDIO_SIZE_MB = int(os.getenv("MAX_AUDIO_SIZE_MB", "50"))
     SUPPORTED_AUDIO_FORMATS = [".wav", ".mp3", ".flac", ".ogg", ".m4a"]
-
